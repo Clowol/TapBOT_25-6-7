@@ -1,0 +1,24 @@
+# Auto detect text files and perform LF normalization
+* text=auto  eol=lf
+
+
+# Clearly indicate the type of binary file
+*.png binary
+*.jpg binary
+
+*.pdf binary
+*.doc binary
+
+*.zip binary
+
+
+# Special text types must be declared separately
+*.c text
+*.h text
+*.cpp text
+*.py text
+*.yaml text
+*.xml text
+
+*.md text
+*.txt text
