@@ -34,15 +34,16 @@ Open-source implementation for kinematics, control, simulation and modeling of r
 ## 📖 Project Introduction / 项目简介
 This repository contains the complete source code, models, simulation environments and experimental data corresponding to the author’s academic paper and master’s thesis. It focuses on robot arm modeling, motion planning, control algorithms and verification.
 
-<p style="font-size:10px;opacity:0.8;">
+<p style="font-size:8px;opacity:0.8;">
 本仓库完整收录了作者**小论文**与**硕士学位论文**相关的全部代码、机械臂模型、仿真环境与实验数据，聚焦于机械臂建模、轨迹规划、控制算法与实验验证，同时具备学术价值与工程实用性。
 </p>
 
 ---
 
 ## 🎯 Main Functions / 主要功能
-Forward & inverse kinematics, trajectory planning, dynamic modeling, motion control, obstacle avoidance, robot simulation and experimental result visualization.
-<p style="font-size:10px;opacity:0.9;">
+Forward & inverse kinematics, </br>
+trajectory planning, dynamic modeling, motion control, obstacle avoidance, robot simulation and experimental result visualization.
+<p style="font-size:8px;opacity:0.9;">
 - 正/逆运动学求解
 - 轨迹规划算法实现
 - 动力学建模与参数辨识
