@@ -41,8 +41,7 @@ This repository contains the complete source code, models, simulation environmen
 ---
 
 ## 🎯 Main Functions / 主要功能
-Forward & inverse kinematics, </br>
-trajectory planning, dynamic modeling, motion control, obstacle avoidance, robot simulation and experimental result visualization.
+Forward & inverse kinematics, trajectory planning, dynamic modeling, motion control, obstacle avoidance, robot simulation and experimental result visualization.
 <p style="font-size:8px;opacity:0.9;">
 - 正/逆运动学求解
 - 轨迹规划算法实现
