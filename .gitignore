@@ -1,0 +1,42 @@
+# Prerequisites  （依赖关系文件）
+*.d
+
+# C/C++ 编译中间文件
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+*.ko
+
+# Precompiled Headers(预编译头文件)
+*.gch
+*.pch
+
+# 编译产物（库和可执行文件）
+# Compiled Static library (静态库)
+*.a
+*.lib
+*.lai
+*.la
+# Compiled Dynamic libraries (动态库)
+*.so
+*.dylib
+*.dll
+# Executables(可执行文件)
+*.exe
+*.out
+*.app
+
+
+# Fortran module files
+*.mod
+*.smod
+
+# 虚拟环境
+venv/
+env/
+.venv/
+.env
+
+meta/video/

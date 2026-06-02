@@ -1,0 +1,58 @@
+# =========================
+# 全局规则
+# =========================
+
+# 默认：自动识别文本文件，统一以 LF 存储
+* text=auto
+
+# =========================
+# C / ASM 源码（核心）
+# =========================
+*.c     text eol=lf
+*.h     text eol=lf
+*.s     text eol=lf
+*.S     text eol=lf
+
+# =========================
+# Keil / STM32 工程文件
+# =========================
+*.uvprojx   text eol=lf
+*.uvoptx    text eol=lf
+*.uvguix.*  text eol=lf
+*.dbgconf   text eol=lf
+*.sct       text eol=lf
+*.icf       text eol=lf
+
+# =========================
+# 文档 / 配置
+# =========================
+*.md        text eol=lf
+*.txt       text eol=lf
+.gitignore  text eol=lf
+.gitattributes text eol=lf
+
+# =========================
+# 脚本
+# =========================
+*.sh        text eol=lf
+*.bat       text eol=crlf
+
+# =========================
+# 二进制文件（禁止换行转换）
+# =========================
+*.jpg       binary
+*.png       binary
+*.gif       binary
+*.pdf       binary
+
+*.hex       binary
+*.bin       binary
+*.axf       binary
+*.elf       binary
+
+# =========================
+# 压缩 / 归档
+# =========================
+*.zip       binary
+*.rar       binary
+*.7z        binary
