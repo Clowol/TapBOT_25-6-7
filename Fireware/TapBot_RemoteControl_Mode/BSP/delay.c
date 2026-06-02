@@ -32,9 +32,9 @@ void delay_init(u8 SYSCLK)
 
 
 /*******************************************************************	    								     
-  * @file		delay_us(uint32_t nus)
+  * @file		  delay_us(uint32_t nus)
   * @brief  	微秒级延时 
-  * @param      -nus 延时时长 	范围：0~233015    								   
+  * @param     -nus 延时时长 	范围：0~233015    								   
   * @retval 	无
   ******************************************************************/   		    								   
 void delay_us(u32 nus)
@@ -57,11 +57,11 @@ void delay_us(u32 nus)
 
 
 /*******************************************************************
-  * @file		delay_ms(u16 nms)
+  * @file		  delay_ms(u16 nms)
   * @brief  	毫秒级延时 
   * @param      -nms 延时时长 范围：0~1864		
   *             [fac_ms = SYSCLK / 8 / 1000]
-  * @note		(SysTick->LOAD为24位寄存器)
+  * @note		  (SysTick->LOAD为24位寄存器)
   *             ->(最大延时为:nms<=0xffffff*8*1000/SYSCLK）  
   *              SYSCLK单位为Hz,nms单位为ms, 在72M条件下,nms<=1864
   * @retval 	 无
@@ -86,9 +86,9 @@ void delay_ms(u16 nms)
 
 
 /*******************************************************************
-  * @file		delay_ms_extend(uint32_t nms)
+  * @file		  delay_ms_extend(uint32_t nms)
   * @brief  	毫秒级延时(extend) 
-  * @param      -nms 延时时长 范围：0~1864	
+  * @param    -nms 延时时长 范围：0~1864	
   * @retval 	无
   ******************************************************************/ 
 void delay_ms_extend(u32 nms) {
