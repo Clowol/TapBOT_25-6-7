@@ -8,7 +8,7 @@
 #define __APP_CONFIG_H
 
 /* UART baud rates */
-/* UART波特率设置   */
+/* UART波特率设�?  */
 #define APP_USART1_BAUD                 4000000U
 #define APP_USART2_BAUD                 115200U
 #define APP_USART3_BAUD                 115200U
@@ -32,13 +32,13 @@
 #define APP_UART4_DMA_TX_BSIZE          100U
 
 /* Remote controller thresholds */
-/* 遥控器开关和模拟量阈值设置 */
+/* 遥控器开关和模拟量阈值设�?*/
 #define RMT_SWITCH_LOW_THRESHOLD        1300U
 #define RMT_SWITCH_HIGH_THRESHOLD       1700U
 #define RMT_ANALOG_DEADBAND             1.0f
 
 /* Remote controller calibration */
-/* 遥控器输入输出映射设置 */
+/* 遥控器输入输出映射设�?*/
 #define RMT_RUD_IN_LEFT                 283.0f
 #define RMT_RUD_IN_MID                  1002.0f
 #define RMT_RUD_IN_RIGHT                1722.0f
@@ -61,7 +61,7 @@
 #define RMT_Y1_OUT_FORWARD              50.0f
 
 /* Actuator mappings */
-/* 执行器映射设置 */
+/* 执行器映射设�?*/
 #define YUSHU_GEAR_IN_BACK              -50.0f
 #define YUSHU_GEAR_IN_MID               0.0f
 #define YUSHU_GEAR_IN_FORWARD           50.0f
@@ -79,6 +79,29 @@
 #define PTZ_UP_DOWN_SPEED_DEFAULT       0x20U
 #define PTZ_LEFT_RIGHT_SPEED_DEFAULT    0x10U
 
+/* Unitree M8010 actuator transport */
+#define YUSHU_M8010_USE_CAN             1U
+#define YUSHU_M8010_CAN_TX_ID           0x01U
+#define YUSHU_M8010_ID                  0U
+#define YUSHU_M8010_MODE_IDLE           0U
+#define YUSHU_M8010_MODE_RUN            1U
+#define YUSHU_M8010_MODE_STOP           YUSHU_M8010_MODE_RUN
+#define YUSHU_RMT_GEAR_STOP_DEADBAND    5.0f
+#define YUSHU_SPEED_STOP_EPS            0.1f
+
+/* USART2 carries the binary upper-computer protocol. Keep text debug off by default. */
+#define APP_USART2_TEXT_DEBUG           0U
+
+/* WitMotion HWT905CAN IMU on PTZ joint */
+#define WIT_IMU_CAN_ADDR                0x50U
+#define WIT_IMU_USE_CAN2                1U
+
+/* PTZ local angle closed-loop parameters */
+#define PTZ_ANGLE_DEFAULT_TOL_X100      100U
+#define PTZ_ANGLE_DEFAULT_SPEED         0x20U
+
 #endif /* __APP_CONFIG_H */
+
+
 
 /******************* (C) COPYRIGHT 2026 END OF FILE *****************************/

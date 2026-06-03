@@ -9,7 +9,6 @@
 
 #include    <stdint.h>
 //#include "main.h" // stm32 hal
-#include    "function.h"
 #include    "ris_protocol.h"
 #pragma     pack(1)
 

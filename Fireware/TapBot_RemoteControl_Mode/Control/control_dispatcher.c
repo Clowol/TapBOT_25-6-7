@@ -1,19 +1,13 @@
-/******************** (C) COPYRIGHT 2026 *****************************************
-   * @author      Clomol
-   * @date        2026-2027
-   * @brief       控制调度器实现，负责遥控器/上位机控制源切换、命令解析与执行
-   * @license     [z]本代码仅用于教学与科研目的，未经作者书面许可，不得用于商业用途
-   *              This project is released under the MIT License.
-   * @note        
-   * @warning     上位机超时时间需与心跳包发送频率匹配
+/******************** (C) COPYRIGHT 2024 *****************************************
+ * File Name  : control_dispatcher.c
+ * Description: Runtime control-source allocator for remote and upper computer.
 *********************************************************************************/
 #include "control_dispatcher.h"
-
+#include "function.h"
 #include "rmt_data.h"
 #include "ptz_data.h"
+#include "app_config.h"
 
-
-/************************************** 全局变量定义 ***************************************/
 volatile ctrl_source_t g_ctrl_source_req = CTRL_SRC_RMT;
 volatile ctrl_source_t g_ctrl_source_active = CTRL_SRC_RMT;
 ctrl_cmd_t g_ctrl_cmd;
@@ -22,47 +16,21 @@ static ctrl_cmd_t UpperCmd;
 static volatile u16 UpperTimeoutTicks = CTRL_UPPER_TIMEOUT_TICKS_10MS;
 static volatile u8 UpperCmdValid = 0U;
 
-
-
-/**************************************** 函数定义 ****************************************/
-/**
- * @brief 从字节数组中读取小端16位有符号整数
- * @param data 指向至少2字节的数组
- * @return 解析出的有符号16位整数值
- */
 static s16 ControlDispatcher_ReadS16LE(const u8 *data)
 {
 	return (s16)((u16)data[0] | ((u16)data[1] << 8));
 }
 
-
-/**
- * @brief 从字节数组中读取小端16位无符号整数
- * @param data 指向至少2字节的数组
- * @return 解析出的无符号16位整数值
- */
 static u16 ControlDispatcher_ReadU16LE(const u8 *data)
 {
 	return (u16)((u16)data[0] | ((u16)data[1] << 8));
 }
 
-
-/**
- * @brief 检查当前是否允许执行上位机命令
- * @return 1:允许，0:不允许
- * @note 条件：遥控器与上位机切换标志 g_RmtUpManCtrlMode 为 UP_MODE（即允许上位机介入）
- */
 static u8 ControlDispatcher_CanExecUpper(void)
 {
 	return (g_RmtUpManCtrlMode == UP_MODE) ? 1U : 0U;
 }
 
-
-/**
- * @brief 清除控制命令结构体中的所有字段
- * @param cmd 指向待清除的命令结构体（不能为NULL）
- * @note 将各个字段设为安全默认值，valid置0
- */
 static void ControlDispatcher_ClearCmd(ctrl_cmd_t *cmd)
 {
 	u8 i;
@@ -86,17 +54,10 @@ static void ControlDispatcher_ClearCmd(ctrl_cmd_t *cmd)
 	cmd->valid = 0U;
 }
 
-
-/**
- * @brief 从遥控器全局变量加载控制命令
- * @param cmd 输出参数，填充后的命令结构体
- * @note 读取 RmtGearValue、Rmt_Y1_Value 及遥控器通道状态，并处理遥控器断电/通信异常时的离合器保护
- */
 static void ControlDispatcher_LoadRemoteCmd(ctrl_cmd_t *cmd)
 {
 	ControlDispatcher_ClearCmd(cmd);
 
-    /* 遥控器断电或通信异常时，强制离合器断开 */
 	if((RmtPwrOffFlg != 0U) || (RmtOutCommunFlg != 0U))
 	{
 		cmd->clutch_cmd = 0U;
@@ -118,16 +79,6 @@ static void ControlDispatcher_LoadRemoteCmd(ctrl_cmd_t *cmd)
 	cmd->valid = 1U;
 }
 
-
-
-
-/**************************** 上位机命令执行函数 *****************************/
-/**
- * @brief 执行玉树CAN控制命令（UPPER_CMD_EXEC_YUSHU_CAN）
- * @param payload 数据负载指针，格式：payload[0]=cmd, [1]=mode, [2-3]=W, [4-5]=T, [6-7]=K_W
- * @param len     负载长度（至少8字节）
- * @note 解析后调用 YushuMotor_SendControl() 发送给玉树电机，并更新心跳
- */
 static void ControlDispatcher_ExecYushuCan(const u8 *payload, u8 len)
 {
 	if((payload == 0) || (len < 8U) || (ControlDispatcher_CanExecUpper() == 0U))
@@ -144,76 +95,82 @@ static void ControlDispatcher_ExecYushuCan(const u8 *payload, u8 len)
 	ControlDispatcher_NotifyUpperAlive();
 }
 
-
-/**
- * @brief 执行舵机速度控制命令（UPPER_CMD_EXEC_STEER_SPEED）
- * @param payload 数据负载指针，格式：payload[0]=使能掩码, 之后每2字节一个速度值（按舵机顺序）
- * @param len     负载长度（至少9字节，支持4个舵机）
- * @note 将速度值填入 SteerSendMsgArr，并调用同步速度运行函数
- */
 static void ControlDispatcher_ExecSteerSpeed(const u8 *payload, u8 len)
 {
-	u8 i;
-	u8 enable_mask;
+	s16 rotate_speed;
 
-	if((payload == 0) || (len < 9U) || (ControlDispatcher_CanExecUpper() == 0U))
+	if((payload == 0) || (ControlDispatcher_CanExecUpper() == 0U))
 	{
 		return;
 	}
 
-	enable_mask = payload[0];
-	if(SteerRunMode != STEER_SPEED_MODE)
+	if(len >= 9U)
 	{
-		SteerRunMode = STEER_SPEED_MODE;
-		SendSteer_SYNC_SetMode(STEER_SPEED_MODE);
-	}
-
-	for(i = 0U; i < CTRL_STEER_NUM; i++)
-	{
-		if((enable_mask & (1U << i)) != 0U)
+		if((payload[0] & (1U << STEER_ROTATE_SERVO_INDEX)) != 0U)
 		{
-			SteerSendMsgArr[i].SpeedData = ControlDispatcher_ReadS16LE(&payload[1U + (i * 2U)]);
+			rotate_speed = ControlDispatcher_ReadS16LE(&payload[1U + (STEER_ROTATE_SERVO_INDEX * 2U)]);
 		}
 		else
 		{
-			SteerSendMsgArr[i].SpeedData = 0;
+			rotate_speed = 0;
 		}
 	}
+	else if(len >= 3U)
+	{
+		rotate_speed = (payload[0] != 0U) ? ControlDispatcher_ReadS16LE(&payload[1]) : 0;
+	}
+	else
+	{
+		return;
+	}
 
-	SendSteer_SYNC_SpeedRun();
+	if(SteerRunMode != STEER_MIXED_MODE)
+	{
+		SteerRunMode = STEER_MIXED_MODE;
+		SendSteer_SYNC_SetDefaultMode();
+	}
+
+	SteerSendMsgArr[STEER_ROTATE_SERVO_INDEX].SpeedData = rotate_speed;
+	SendSteer_Rotate_SpeedRun();
 	ControlDispatcher_NotifyUpperAlive();
 }
-
-
-/**
- * @brief 执行舵机位置控制命令（UPPER_CMD_EXEC_STEER_POSITION）
- * @param payload 数据负载指针，格式：payload[0]=使能掩码, 之后每2字节一个位置值（按舵机顺序），
- *                最后4字节：运行时间（2字节）和速度（2字节）
- * @param len     负载长度（至少13字节，支持4个舵机）
- */
 static void ControlDispatcher_ExecSteerPosition(const u8 *payload, u8 len)
 {
 	u8 i;
 	u8 enable_mask;
 	u16 run_time;
 	u16 speed;
+	u8 time_offset;
 
-	if((payload == 0) || (len < 13U) || (ControlDispatcher_CanExecUpper() == 0U))
+	if((payload == 0) || (ControlDispatcher_CanExecUpper() == 0U))
+	{
+		return;
+	}
+
+	if(len >= 13U)
+	{
+		time_offset = 9U;
+	}
+	else if(len >= 11U)
+	{
+		time_offset = 7U;
+	}
+	else
 	{
 		return;
 	}
 
 	enable_mask = payload[0];
-	run_time = ControlDispatcher_ReadU16LE(&payload[9]);
-	speed = ControlDispatcher_ReadU16LE(&payload[11]);
+	run_time = ControlDispatcher_ReadU16LE(&payload[time_offset]);
+	speed = ControlDispatcher_ReadU16LE(&payload[time_offset + 2U]);
 
-	if(SteerRunMode != STEER_POSITION_MODE)
+	if(SteerRunMode != STEER_MIXED_MODE)
 	{
-		SteerRunMode = STEER_POSITION_MODE;
-		SendSteer_SYNC_SetMode(STEER_POSITION_MODE);
+		SteerRunMode = STEER_MIXED_MODE;
+		SendSteer_SYNC_SetDefaultMode();
 	}
 
-	for(i = 0U; i < CTRL_STEER_NUM; i++)
+	for(i = 0U; i < STEER_POSITION_SERVO_NUM; i++)
 	{
 		if((enable_mask & (1U << i)) != 0U)
 		{
@@ -228,16 +185,9 @@ static void ControlDispatcher_ExecSteerPosition(const u8 *payload, u8 len)
 		}
 	}
 
-	SendSteer_SYNC_DataFun();
+	SendSteer_Position3_SYNC_DataFun();
 	ControlDispatcher_NotifyUpperAlive();
 }
-
-
-/**
- * @brief 执行舵机模式设置命令（UPPER_CMD_EXEC_STEER_MODE）
- * @param payload 数据负载指针，payload[0]=模式（STEER_SPEED_MODE 或 STEER_POSITION_MODE）
- * @param len     负载长度（至少1字节）
- */
 static void ControlDispatcher_ExecSteerMode(const u8 *payload, u8 len)
 {
 	if((payload == 0) || (len < 1U) || (ControlDispatcher_CanExecUpper() == 0U))
@@ -245,20 +195,9 @@ static void ControlDispatcher_ExecSteerMode(const u8 *payload, u8 len)
 		return;
 	}
 
-	if((payload[0] == STEER_SPEED_MODE) || (payload[0] == STEER_POSITION_MODE))
-	{
-		SteerRunMode = payload[0];
-		SendSteer_SYNC_SetMode(SteerRunMode);
-		ControlDispatcher_NotifyUpperAlive();
-	}
+	SendSteer_SYNC_SetDefaultMode();
+	ControlDispatcher_NotifyUpperAlive();
 }
-
-/**
- * @brief 执行云台控制命令（UPPER_CMD_EXEC_PTZ）
- * @param payload 数据负载指针，格式：payload[0]=上下命令, [1]=左右命令, [2]=上下速度, [3]=左右速度
- * @param len     负载长度（至少4字节）
- * @note 设置全局云台控制变量并发送
- */
 static void ControlDispatcher_ExecPtz(const u8 *payload, u8 len)
 {
 	if((payload == 0) || (len < 4U) || (ControlDispatcher_CanExecUpper() == 0U))
@@ -266,22 +205,35 @@ static void ControlDispatcher_ExecPtz(const u8 *payload, u8 len)
 		return;
 	}
 
+	PTZ_DisableAngleCtrl();
 	PTZ_UpDownMoveFlg = payload[0];
 	PTZ_LftRgtMoveFlg = payload[1];
-	PTZ_SendMsg_Cmd.Up_Down_Speed = payload[2];
-	PTZ_SendMsg_Cmd.Lft_Rgt_Speed = payload[3];
+	PTZ_SetUDSpeed(payload[2]);
+	PTZ_SetLRSpeed(payload[3]);
 	Send_PTZ_Data();
 	ControlDispatcher_NotifyUpperAlive();
 }
 
+static void ControlDispatcher_ExecPtzAngle(const u8 *payload, u8 len)
+{
+	s16 yaw_target;
+	s16 pitch_target;
+	u16 tolerance;
+	u8 speed;
 
+	if((payload == 0) || (len < 7U) || (ControlDispatcher_CanExecUpper() == 0U))
+	{
+		return;
+	}
 
+	yaw_target = ControlDispatcher_ReadS16LE(&payload[0]);
+	pitch_target = ControlDispatcher_ReadS16LE(&payload[2]);
+	tolerance = ControlDispatcher_ReadU16LE(&payload[4]);
+	speed = payload[6];
+	PTZ_SetAngleTarget(yaw_target, pitch_target, tolerance, speed);
+	ControlDispatcher_NotifyUpperAlive();
+}
 
-/*********************************   调度器   *********************************************/ 
-/**
- * @brief 控制调度器初始化
- * @note 清除所有命令缓冲区，复位控制源为遥控器，重置上位机超时计数
- */
 void ControlDispatcher_Init(void)
 {
 	ControlDispatcher_ClearCmd(&g_ctrl_cmd);
@@ -292,13 +244,6 @@ void ControlDispatcher_Init(void)
 	UpperCmdValid = 0U;
 }
 
-
-/**
- * @brief 控制调度器周期性更新函数（通常放在主循环中）
- * @note 负责上位机超时计数、控制源选择、命令装载
- *       当允许上位机控制、上位机命令有效且上位机在线时，切换到上位机模式；
- *       否则使用遥控器模式
- */
 void ControlDispatcher_Update(void)
 {
 	if(UpperTimeoutTicks < CTRL_UPPER_TIMEOUT_TICKS_10MS)
@@ -306,7 +251,6 @@ void ControlDispatcher_Update(void)
 		UpperTimeoutTicks++;
 	}
 
-    /* 判断是否应使用上位机命令 */
 	if((g_RmtUpManCtrlMode == UP_MODE) && (UpperCmdValid != 0U) && (ControlDispatcher_IsUpperAlive() != 0U))
 	{
 		g_ctrl_source_req = CTRL_SRC_UPPER;
@@ -324,12 +268,6 @@ void ControlDispatcher_Update(void)
 	}
 }
 
-
-/**
- * @brief 设置上位机命令（立即生效）
- * @param cmd 指向包含完整控制信息的命令结构体
- * @note 会拷贝命令内容，并更新有效标志和心跳
- */
 void ControlDispatcher_SetUpperCmd(const ctrl_cmd_t *cmd)
 {
 	if(cmd == 0)
@@ -343,13 +281,6 @@ void ControlDispatcher_SetUpperCmd(const ctrl_cmd_t *cmd)
 	ControlDispatcher_NotifyUpperAlive();
 }
 
-/**
- * @brief 上位机数据包接收回调，根据命令ID分发处理
- * @param cmd_id  命令ID（见 UPPER_CMD_* 宏）
- * @param payload 数据负载指针
- * @param len     数据长度
- * @note 该函数在解析到完整上位机数据包时调用，内部会调用相应的执行函数或更新命令缓存
- */
 void ControlDispatcher_OnUpperPacketReceived(u8 cmd_id, const u8 *payload, u8 len)
 {
 	u8 i;
@@ -361,7 +292,6 @@ void ControlDispatcher_OnUpperPacketReceived(u8 cmd_id, const u8 *payload, u8 le
 
 	switch(cmd_id)
 	{
-        /* 设置控制源（遥控器/上位机） */
 		case UPPER_CMD_SET_SOURCE:
 			if(len >= 1U)
 			{
@@ -370,7 +300,6 @@ void ControlDispatcher_OnUpperPacketReceived(u8 cmd_id, const u8 *payload, u8 le
 			}
 			break;
 
-        /* 设置全部控制参数 */
 		case UPPER_CMD_SET_ALL:
 			if(len >= 9U)
 			{
@@ -432,6 +361,7 @@ void ControlDispatcher_OnUpperPacketReceived(u8 cmd_id, const u8 *payload, u8 le
 		case UPPER_CMD_PTZ:
 			if(len >= 4U)
 			{
+				PTZ_DisableAngleCtrl();
 				UpperCmd.ptz_up_down_cmd = payload[0];
 				UpperCmd.ptz_left_right_cmd = payload[1];
 				UpperCmd.ptz_up_down_speed = payload[2];
@@ -444,6 +374,10 @@ void ControlDispatcher_OnUpperPacketReceived(u8 cmd_id, const u8 *payload, u8 le
 			ControlDispatcher_ExecPtz(payload, len);
 			break;
 
+		case UPPER_CMD_EXEC_PTZ_ANGLE:
+			ControlDispatcher_ExecPtzAngle(payload, len);
+			break;
+
 		case UPPER_CMD_HEARTBEAT:
 			ControlDispatcher_NotifyUpperAlive();
 			break;
@@ -453,34 +387,19 @@ void ControlDispatcher_OnUpperPacketReceived(u8 cmd_id, const u8 *payload, u8 le
 	}
 }
 
-/**
- * @brief 通知调度器上位机仍然在线（刷新心跳计时器）
- * @note 通常在上位机发送心跳包或有效命令时调用
- */
 void ControlDispatcher_NotifyUpperAlive(void)
 {
 	UpperTimeoutTicks = 0U;
 }
 
-/**
- * @brief 查询上位机是否在线（未超时）
- * @return 1:在线，0:离线
- */
 u8 ControlDispatcher_IsUpperAlive(void)
 {
 	return (UpperTimeoutTicks < CTRL_UPPER_TIMEOUT_TICKS_10MS) ? 1U : 0U;
 }
 
-/**
- * @brief 获取当前应执行的控制命令
- * @return 指向最终控制命令的常量指针（只读）
- * @note 外部执行模块应调用此函数获取最新有效命令
- */
 const ctrl_cmd_t *ControlDispatcher_GetCmd(void)
 {
 	return &g_ctrl_cmd;
 }
-
-
 
 /******************* (C) COPYRIGHT 2026 END OF FILE ***************************/

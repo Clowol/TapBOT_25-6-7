@@ -10,6 +10,7 @@
       <TargetName>RemoteControl_Mode</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
+      <pCCUsed>5060750::V5.06 update 6 (build 750)::ARMCC</pCCUsed>
       <uAC6>0</uAC6>
       <TargetOption>
         <TargetCommonOption>
@@ -35,8 +36,8 @@
           <SFDFile>$$Device:STM32F107VC$SVD\STM32F107xx.svd</SFDFile>
           <bCustSvd>0</bCustSvd>
           <UseEnv>0</UseEnv>
-          <BinPath></BinPath>
-          <IncludePath></IncludePath>
+          <BinPath>
+          </BinPath><IncludePath></IncludePath>
           <LibPath></LibPath>
           <RegisterFilePath></RegisterFilePath>
           <DBRegisterFilePath></DBRegisterFilePath>
@@ -54,7 +55,7 @@
           <CreateHexFile>1</CreateHexFile>
           <DebugInformation>1</DebugInformation>
           <BrowseInformation>1</BrowseInformation>
-          <ListingPath>.\Listing\</ListingPath>
+          <ListingPath>.\</ListingPath>
           <HexFormatSelection>1</HexFormatSelection>
           <Merge32K>0</Merge32K>
           <CreateBatchFile>0</CreateBatchFile>
@@ -103,9 +104,9 @@
           <AssembleAssemblyFile>0</AssembleAssemblyFile>
           <PublicsOnly>0</PublicsOnly>
           <StopOnExitCode>3</StopOnExitCode>
-          <CustomArgument></CustomArgument>
-          <IncludeLibraryModules></IncludeLibraryModules>
-          <ComprImg>1</ComprImg>
+          <CustomArgument>
+          </CustomArgument><IncludeLibraryModules>
+          </IncludeLibraryModules><ComprImg>1</ComprImg>
         </CommonProperty>
         <DllOption>
           <SimDllName>SARMCM3.DLL</SimDllName>
@@ -138,8 +139,8 @@
           <bUseTDR>1</bUseTDR>
           <Flash2>BIN\UL2CM3.DLL</Flash2>
           <Flash3>"" ()</Flash3>
-          <Flash4></Flash4>
-          <pFcarmOut></pFcarmOut>
+          <Flash4>
+          </Flash4><pFcarmOut></pFcarmOut>
           <pFcarmGrp></pFcarmGrp>
           <pFcArmRoot></pFcArmRoot>
           <FcArmLst>0</FcArmLst>
@@ -187,7 +188,7 @@
             <hadIRAM2>0</hadIRAM2>
             <hadIROM2>0</hadIROM2>
             <StupSel>8</StupSel>
-            <useUlib>0</useUlib>
+            <useUlib>1</useUlib>
             <EndSel>0</EndSel>
             <uLtcg>0</uLtcg>
             <nSecure>0</nSecure>
@@ -335,9 +336,9 @@
             <v6Rtti>0</v6Rtti>
             <VariousControls>
               <MiscControls></MiscControls>
-              <Define>STM32F10X_CL ,USE_STDPERIPH_DRIVER</Define>
+              <Define>STM32F10X_CL,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\Drivers\CMSIS\Device;..\Drivers\CMSIS\Core;..\FWlib\inc;..\FWlib\src;..\Trdlib;..\Trdlib\GO-M8010-6;..\Actuators;..\App;..\App\CPU;..\BSP;..\Comm;..\Control;..\Protocols</IncludePath>
+              <IncludePath>..\Drivers\CMSIS\Device;..\Drivers\CMSIS\Core;..\FWlib\inc;..\FWlib\src;..\Trdlib;..\Trdlib\GO-M8010-6;..\Trdlib\wit_c_sdk;..\Actuators;..\App;..\App\CPU;..\BSP;..\Comm;..\Control;..\Protocols</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -645,21 +646,173 @@
         </Group>
         <Group>
           <GroupName>App</GroupName>
+          <Files>
+            <File>
+              <FileName>main.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\App\main.c</FilePath>
+            </File>
+            <File>
+              <FileName>function.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\App\function.c</FilePath>
+            </File>
+          </Files>
         </Group>
         <Group>
           <GroupName>BSP</GroupName>
+          <Files>
+            <File>
+              <FileName>sys.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\sys.c</FilePath>
+            </File>
+            <File>
+              <FileName>delay.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\delay.c</FilePath>
+            </File>
+            <File>
+              <FileName>led.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\led.c</FilePath>
+            </File>
+            <File>
+              <FileName>timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\timer.c</FilePath>
+            </File>
+            <File>
+              <FileName>adc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\adc.c</FilePath>
+            </File>
+            <File>
+              <FileName>switch.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\switch.c</FilePath>
+            </File>
+            <File>
+              <FileName>encoder.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\encoder.c</FilePath>
+            </File>
+            <File>
+              <FileName>wit_imu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\wit_imu.c</FilePath>
+            </File>
+          </Files>
         </Group>
         <Group>
           <GroupName>Comm</GroupName>
+          <Files>
+            <File>
+              <FileName>usart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Comm\usart.c</FilePath>
+            </File>
+            <File>
+              <FileName>ring_buf.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Comm\ring_buf.c</FilePath>
+            </File>
+            <File>
+              <FileName>uart_rx_driver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Comm\uart_rx_driver.c</FilePath>
+            </File>
+            <File>
+              <FileName>can1.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Comm\can1.c</FilePath>
+            </File>
+            <File>
+              <FileName>can2.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Comm\can2.c</FilePath>
+            </File>
+            <File>
+              <FileName>subboard_link.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Comm\subboard_link.c</FilePath>
+            </File>
+          </Files>
         </Group>
         <Group>
           <GroupName>Control</GroupName>
+          <Files>
+            <File>
+              <FileName>control_math.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Control\control_math.c</FilePath>
+            </File>
+            <File>
+              <FileName>control_dispatcher.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Control\control_dispatcher.c</FilePath>
+            </File>
+          </Files>
         </Group>
         <Group>
           <GroupName>Protocols</GroupName>
+          <Files>
+            <File>
+              <FileName>ros2_comm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Protocols\ros2_comm.c</FilePath>
+            </File>
+            <File>
+              <FileName>rmt_comm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Protocols\rmt_comm.c</FilePath>
+            </File>
+            <File>
+              <FileName>upper_comm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Protocols\upper_comm.c</FilePath>
+            </File>
+            <File>
+              <FileName>upper_feedback.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Protocols\upper_feedback.c</FilePath>
+            </File>
+            <File>
+              <FileName>up_data.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Protocols\up_data.c</FilePath>
+            </File>
+            <File>
+              <FileName>rmt_data.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Protocols\rmt_data.c</FilePath>
+            </File>
+            <File>
+              <FileName>subboard_protocol.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Protocols\subboard_protocol.c</FilePath>
+            </File>
+          </Files>
         </Group>
         <Group>
           <GroupName>Actuators</GroupName>
+          <Files>
+            <File>
+              <FileName>steer_data.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Actuators\steer_data.c</FilePath>
+            </File>
+            <File>
+              <FileName>ptz_data.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Actuators\ptz_data.c</FilePath>
+            </File>
+            <File>
+              <FileName>yushu_motor_data.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Actuators\yushu_motor_data.c</FilePath>
+            </File>
+          </Files>
         </Group>
         <Group>
           <GroupName>Trdlib</GroupName>
@@ -683,6 +836,21 @@
               <FileName>ris_protocol.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Trdlib\GO-M8010-6\ris_protocol.h</FilePath>
+            </File>
+            <File>
+              <FileName>wit_c_sdk.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Trdlib\wit_c_sdk\wit_c_sdk.c</FilePath>
+            </File>
+            <File>
+              <FileName>wit_c_sdk.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Trdlib\wit_c_sdk\wit_c_sdk.h</FilePath>
+            </File>
+            <File>
+              <FileName>REG.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Trdlib\wit_c_sdk\REG.h</FilePath>
             </File>
           </Files>
         </Group>

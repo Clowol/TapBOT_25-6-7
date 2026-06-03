@@ -246,4 +246,7 @@ void RmtYushuMotor_SpeedFun(void)
     YushuMotor_ControlProc();
 }
 
-/******************* (C) COPYRIGHT 2024 END OF FILE *****************************/
+
+
+/******************* (C) COPYRIGHT 2026 END OF FILE ***************************/
+

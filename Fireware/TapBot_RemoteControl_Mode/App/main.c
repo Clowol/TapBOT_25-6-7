@@ -1,115 +1,125 @@
-/******************** (C) COPYRIGHT 2026 *****************************************
- * @file        main.c
- * @author      Clomol
- * @date        2025-2026
- * @brief       main program
- * 
- * @license     [z]本代码仅用于教学与科研目的，未经作者书面许可，不得用于商业用途
- *              This project is released under the MIT License.
- * @note        [z]使用本代码时请保留此版权声明
- *              Please retain this copyright notice when using this code
- * @warning     [z]本人能力有限，这段代码可能存在错误或不完善之处，使用前请仔细检查并测试
- *              I am not responsible for any damage or loss caused by using this code. Please review             
+﻿/******************** (C) COPYRIGHT 2026 *****************************************
+   * @author      Clomol
+   * @date        2026-2027
+   * @brief       锟斤拷锟斤拷锟斤拷锟斤拷冢锟斤拷锟斤拷系统时锟接★拷通锟脚接口★拷执锟斤拷锟斤拷锟酵凤拷锟斤拷模锟斤拷锟绞硷拷锟斤拷锟?   *              锟斤拷锟斤拷 while(1) 锟叫碉拷锟斤拷遥锟斤拷锟斤拷锟斤拷锟斤拷位锟斤拷协锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟?   * @license     [z]锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷诮锟窖э拷锟斤拷锟斤拷目锟侥ｏ拷未锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟缴ｏ拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷业锟斤拷途
+   *              This project is released under the MIT License.
+   * @note        USART2 锟斤拷锟斤拷锟斤拷位锟斤拷锟斤拷锟斤拷锟斤拷协锟介，默锟较诧拷要锟节该达拷锟斤拷锟斤拷锟斤拷谋锟斤拷锟斤拷锟斤拷锟较拷锟?   * @warning     锟睫改筹拷始锟斤拷顺锟斤拷时锟斤拷确锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷系锟斤拷锟斤拷锟斤拷 CAN 锟斤拷始锟斤拷应锟斤拷锟节憋拷锟斤拷锟斤拷/IMU锟斤拷锟斤拷锟斤拷始锟斤拷锟斤拷
 *********************************************************************************/
 #include "stm32f10x.h"
 #include "function.h"
 
-int main()
+/***************************************************************************************************
+ * @name   main(void)
+ * @brief  系统锟斤拷锟斤拷诤锟斤拷锟? * @param  锟斤拷
+ * @return 锟斤拷锟斤拷锟斤拷锟斤拷虏锟斤拷锟斤拷锟? * @note   锟斤拷始锟斤拷顺锟津：伙拷锟斤拷锟斤拷锟斤拷 -> 通锟脚接匡拷 -> 锟斤拷锟狡凤拷锟斤拷锟斤拷 -> 锟斤拷时锟斤拷 -> 执锟斤拷锟斤拷默锟斤拷状态 -> 锟斤拷锟斤拷模锟介。
+ ***************************************************************************************************/
+int main(void)
 {
-    static u16 cnt1s = 0;       // 1s计数器
-    static u16 cnt30ms = 0;     // 30ms计数器
-    static u16 cnt50ms = 0;     // 50ms计数器
-    static u16 cnt100ms = 0;    // 100ms计数器
-    static u16 cnt200ms = 0;    // 200ms计数器
-    static u16 cnt300ms = 0;    // 300ms计数器
-    static u16 cnt500ms = 0;    // 500ms计数器
+    static u16 cnt1s = 0U;
+    static u16 cnt30ms = 0U;
+    static u16 cnt50ms = 0U;
+    static u16 cnt100ms = 0U;
+    static u16 cnt200ms = 0U;
+    static u16 cnt300ms = 0U;
+    static u16 cnt500ms = 0U;
 
-    SystemInit();              // 系统时钟配置
-    delay_init(72);			   // 延时函数 初始化
+    /********************************** 系统锟斤拷锟斤拷锟斤拷始锟斤拷 ********************************************/
+    SystemInit();
+    delay_init(72);
 
-    LED_Init();                // LED 初始化
-    NVIC_Configuration();      // NVIC中断优先级分组配置
+    LED_Init();
+    NVIC_Configuration();
 
-    USART1_Init(APP_USART1_BAUD);		// 串口1-宇树电机-485
-	USART2_Init(APP_USART2_BAUD); 		// 串口2-上位机/调试-232
-	USART3_Init(APP_USART3_BAUD); 		// 串口3-遥控器接收器-TTL CBUS
-	USART4_Init(APP_UART4_BAUD);		// 串口4-云台-485
-	USART5_Init(APP_UART5_BAUD);		// 串口5-舵机-485
+    /********************************** 通锟脚接口筹拷始锟斤拷 ********************************************/
+    USART1_Init(APP_USART1_BAUD);
+    USART2_Init(APP_USART2_BAUD);
+    USART3_Init(APP_USART3_BAUD);
+    USART4_Init(APP_UART4_BAUD);
+    USART5_Init(APP_UART5_BAUD);
+    SubBoard_LinkInit();
 
-    Switch_Init();             // 开关输入初始化
-    // ADC1_Init();               // ADC1 初始化
+    USER_CAN1_Init();
+    USER_CAN2_Init();
 
-    USER_CAN1_Init();             // CAN1 初始化
-    // USER_CAN2_Init();             // CAN2 初始化
+    /********************************** 锟藉级锟斤拷锟斤拷锟斤拷锟斤拷锟绞硷拷锟?****************************************/
+    Switch_Init();
+    /* ADC1_Init(); */
 
-    Timer3_Init(10,7199);		  // 1ms 定时
-	Timer4_Init(500,7199);		  // 50ms 定时
+    /********************************** 应锟斤拷模锟斤拷锟绞硷拷锟?********************************************/
+    ControlDispatcher_Init();
 
-    SendSteer_SYNC_SetMode(STEER_SPEED_MODE);
-	Send_PTZ_Data();
-	Encoder_Init();
+    Timer3_Init(10, 7199);
+    Timer4_Init(500, 7199);
 
+    SendSteer_SYNC_SetDefaultMode();
+    Send_PTZ_Data();
+    Encoder_Init();
+    WitImu_Init();
+
+#if APP_USART2_TEXT_DEBUG
     swgPrtUx(USART2, "\r\n Init Ok \r\n");
+#endif
 
     while(1)
     {
-		debug();
+        /********************************** 锟角讹拷时锟斤拷锟斤拷 ********************************************/
+        ROS2_CommProc();
+        FunctionProce();
 
-		ROS2_CommProc();
-		
-		FunctionProce();
-		
-		if(flag10ms)			   										
-		{
-            /*==========  10ms ==========*/
-			flag10ms = 0;												
-			Function_10ms();			
+        /********************************** 10ms锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 **************************************/
+        if(flag10ms)
+        {
+            flag10ms = 0U;
+            Function_10ms();
 
-			/*==========  30ms ==========*/
-			if(++cnt30ms>=3)
-			{
-				cnt30ms=0;
-				Function_30ms();		
-			}
+            if(++cnt30ms >= 3U)
+            {
+                cnt30ms = 0U;
+                Function_30ms();
+            }
 
-            /*==========  50ms ==========*/
-			if(++cnt50ms>=5)     
-			{
-				cnt50ms=0;
-				Function_50ms();		
-			}
-			/*==========  100ms ==========*/
-			if(++cnt100ms>=10)     
-			{
-				cnt100ms=0;
-				Function_100ms();		
-			}
-			/*==========  200ms ==========*/	
-			if(++cnt200ms>=20)
-			{
-				cnt200ms = 0;
-				Function_200ms();   
-			}
-			/*==========  300ms ==========*/
-			if(++cnt300ms>=30)
-			{
-				cnt300ms = 0;
-				Function_300ms();  
-			}
-			/*==========  500ms ==========*/
-			if(++cnt500ms>=50)
-			{
-				cnt500ms = 0;
-				Function_500ms();  
-			}
-            /*==========  1s ==========*/
-			if(++cnt1s>=100)	   								
-			{
-				cnt1s=0;
-				Function_1s();				
-			}
-		}
+            if(++cnt50ms >= 5U)
+            {
+                cnt50ms = 0U;
+                Function_50ms();
+            }
+
+            if(++cnt100ms >= 10U)
+            {
+                cnt100ms = 0U;
+                Function_100ms();
+            }
+
+            if(++cnt200ms >= 20U)
+            {
+                cnt200ms = 0U;
+                Function_200ms();
+            }
+
+            if(++cnt300ms >= 30U)
+            {
+                cnt300ms = 0U;
+                Function_300ms();
+            }
+
+            if(++cnt500ms >= 50U)
+            {
+                cnt500ms = 0U;
+                Function_500ms();
+            }
+
+            if(++cnt1s >= 100U)
+            {
+                cnt1s = 0U;
+                Function_1s();
+            }
+        }
     }
 }
 
+
+
+
 /******************* (C) COPYRIGHT 2026 END OF FILE *****************************/
+
+
