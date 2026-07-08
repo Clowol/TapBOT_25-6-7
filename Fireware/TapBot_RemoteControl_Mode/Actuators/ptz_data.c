@@ -1,21 +1,16 @@
-/******************** (C) COPYRIGHT 2024 *****************************************
- * File Name  : ptz_data.c
- * Description: PTZ command driver for the new gimbal protocol.
-*********************************************************************************/
 /******************** (C) COPYRIGHT 2026 *****************************************
-   * @author      Clomol
-   * @date        2026-2027
-   * @brief       
-   * @license     [z]本代码仅用于教学与科研目的，未经作者书面许可，不得用于商业用途
-   *              This project is released under the MIT License.
-   * @note        
-   * @warning     
-*********************************************************************************/
+ * @file        ptz_data.c
+ * @brief       PTZ command driver for the new gimbal protocol.
+ * @note        
+ * @warning     
+ * @license     This project is released under the MIT License.
+ *********************************************************************************/
 #include "ptz_data.h"
 #include "control_dispatcher.h"
 #include "wit_imu.h"
 #include <string.h>
 
+/********************************** Debugging and printing macro encapsulation ********************************************/
 #if PTZ_DEBUG_EN == 1U
 #define PTZ_DEBUG_PRINT(...)    swgPrtUx(USART2, __VA_ARGS__)
 #else
@@ -25,6 +20,15 @@
 u8 PTZ_UpDownMoveFlg = PTZ_STOP;
 u8 PTZ_LftRgtMoveFlg = PTZ_STOP;
 
+/*  PTZ send/receive frame  */
+/*
+ *       ---------------------------------------------------------
+ * 		|  byte1 | byte2| byte3 | byte4 | byte5 | byte6 | byte7  |
+ * 		|  byte  | ARR  | Ctl1  | Ctl2  | Ctl1  | Ctl2  | Check  |
+ * 		|   FF	 |  01  |  CMD1 |  CMD2 | DATA1 | DATA2 | Sum    |
+ * 		----------------------------------------------------------
+
+*/
 PTZ_SendFrame PTZ_SendFrame_Cmd =
 {
     PTZ_START_BYTE,
@@ -37,12 +41,28 @@ PTZ_SendFrame PTZ_SendFrame_Cmd =
 };
 
 PTZ_RecvFrame PTZ_RecvFrame_Cmd = {0};
+
+
 PTZ_Status_E Ptz_WorkStatus = PTZ_STATUS_IDLE;
+
 static u8 PtzAngleCtrlEnable = 0U;
 static s16 PtzTargetYawX100 = 0;
 static s16 PtzTargetPitchX100 = 0;
 static u16 PtzTargetToleranceX100 = PTZ_ANGLE_DEFAULT_TOL_X100;
 static u8 PtzTargetSpeed = PTZ_ANGLE_DEFAULT_SPEED;
+
+
+/*      PID status structure    */
+typedef struct
+{
+    float integral;
+    float prev_error;
+    u8 initialized;             //  init flag
+} ptz_pid_state_t;
+
+static ptz_pid_state_t PtzYawPid = {0.0f, 0.0f, 0U};
+static ptz_pid_state_t PtzPitchPid = {0.0f, 0.0f, 0U};
+
 
 static u8 PTZ_CheckSum(const u8 *pBuff, u16 len)
 {
@@ -63,6 +83,8 @@ static u8 PTZ_CheckSum(const u8 *pBuff, u16 len)
     return sum;
 }
 
+
+/* ========================   SPEED  LIMIT ============================= */
 static u8 PTZ_LimitSpeed(u8 speed, u8 default_speed)
 {
     if(speed > PTZ_SPEED_MAX)
@@ -73,6 +95,82 @@ static u8 PTZ_LimitSpeed(u8 speed, u8 default_speed)
     return speed;
 }
 
+
+/* ========================   pid reset ============================= */
+static void PTZ_ResetPid(ptz_pid_state_t *pid)
+{
+    if(pid == 0)
+    {
+        return;
+    }
+
+    pid->integral = 0.0f;
+    pid->prev_error = 0.0f;
+    pid->initialized = 0U;
+}
+
+static float PTZ_ClampFloat(float value, float min_value, float max_value)
+{
+    if(value < min_value)
+    {
+        return min_value;
+    }
+    if(value > max_value)
+    {
+        return max_value;
+    }
+    return value;
+}
+
+static u8 PTZ_PidSpeed(ptz_pid_state_t *pid, s16 error_x100, u8 max_speed)
+{
+    float error = (float)error_x100;
+    float derivative = 0.0f;
+    float output;
+
+    if((pid == 0) || (max_speed == 0U))
+    {
+        return 0U;
+    }
+
+    /*   differential term   */
+    if(pid->initialized != 0U)
+    {
+        derivative = (error - pid->prev_error) / PTZ_ANGLE_PID_DT_S;
+    }
+    else
+    {
+        pid->initialized = 1U;
+    }
+
+    pid->integral += error * PTZ_ANGLE_PID_DT_S;
+    pid->integral = PTZ_ClampFloat(pid->integral, -PTZ_ANGLE_PID_I_LIMIT, PTZ_ANGLE_PID_I_LIMIT);
+    pid->prev_error = error;
+
+    output = (PTZ_ANGLE_PID_KP * error) +
+             (PTZ_ANGLE_PID_KI * pid->integral) +
+             (PTZ_ANGLE_PID_KD * derivative);
+
+    /*      Take the absolute value     */
+    if(output < 0.0f)       
+    {
+        output = -output;
+    }
+
+    /*      speed control       */
+    if(output > (float)max_speed)
+    {
+        output = (float)max_speed;
+    }
+    if((output > 0.0f) && (output < (float)PTZ_ANGLE_PID_MIN_SPEED))
+    {
+        output = (float)PTZ_ANGLE_PID_MIN_SPEED;
+    }
+
+    return (u8)(output + 0.5f);
+}
+
+/*            Direction indicator to motion command code          */
 static PTZ_MoveCmd_E PTZ_DirectionToCmd(u8 up_down, u8 left_right)
 {
     if(left_right == PTZ_LEFT)
@@ -124,6 +222,15 @@ static void PTZ_UpdateFrameFromFlags(void)
     PTZ_SendFrame_Cmd.CheckSum = PTZ_CheckSum(&PTZ_SendFrame_Cmd.DevAddr, 5U);
 }
 
+
+/********************************** MExternal interface functions ********************************************/
+
+
+/********************************************************************************
+ * @brief   Push the data to be sent to the intelligent layer into the send buffer
+ * @param   无
+ * @retval  无
+ ********************************************************************************/
 void Send_PTZ_Data(void)
 {
     u8 i;
@@ -159,6 +266,11 @@ void Send_PTZ_Data(void)
 #endif
 }
 
+
+/********************************************************************************
+ * @brief   Set pan-tilt movement commands
+ * @param   cmd 
+ ********************************************************************************/
 void PTZ_SetMoveCmd(PTZ_MoveCmd_E cmd)
 {
     PTZ_UpDownMoveFlg = PTZ_STOP;
@@ -217,6 +329,9 @@ void PTZ_Stop(void)
     Send_PTZ_Data();
 }
 
+
+
+/*  Calculate the difference between the target angle and the current angle */
 static s16 PTZ_AngleDiffX100(s16 target, s16 current)
 {
     s32 diff = (s32)target - (s32)current;
@@ -238,13 +353,17 @@ void PTZ_SetAngleTarget(s16 yaw_deg_x100, s16 pitch_deg_x100, u16 tolerance_x100
     PtzTargetYawX100 = yaw_deg_x100;
     PtzTargetPitchX100 = pitch_deg_x100;
     PtzTargetToleranceX100 = (tolerance_x100 == 0U) ? PTZ_ANGLE_DEFAULT_TOL_X100 : tolerance_x100;
-    PtzTargetSpeed = (speed == 0U) ? PTZ_ANGLE_DEFAULT_SPEED : speed;
+    PtzTargetSpeed = PTZ_LimitSpeed((speed == 0U) ? PTZ_ANGLE_DEFAULT_SPEED : speed, PTZ_ANGLE_DEFAULT_SPEED);
+    PTZ_ResetPid(&PtzYawPid);
+    PTZ_ResetPid(&PtzPitchPid);
     PtzAngleCtrlEnable = 1U;
 }
 
 void PTZ_DisableAngleCtrl(void)
 {
     PtzAngleCtrlEnable = 0U;
+    PTZ_ResetPid(&PtzYawPid);
+    PTZ_ResetPid(&PtzPitchPid);
 }
 
 static void PTZ_AngleControlProc(void)
@@ -252,9 +371,17 @@ static void PTZ_AngleControlProc(void)
     const wit_imu_feedback_t *imu = WitImu_GetFeedback();
     s16 yaw_error;
     s16 pitch_error;
+    u8 yaw_speed = 0U;
+    u8 pitch_speed = 0U;
 
-    if((PtzAngleCtrlEnable == 0U) || (imu->valid == 0U))
+    if(PtzAngleCtrlEnable == 0U)
     {
+        return;
+    }
+    if(imu->valid == 0U)        // if IMU data is invalid 
+    {
+        PTZ_Stop();
+        PTZ_DisableAngleCtrl();
         return;
     }
 
@@ -267,31 +394,46 @@ static void PTZ_AngleControlProc(void)
     if(yaw_error > (s16)PtzTargetToleranceX100)
     {
         PTZ_LftRgtMoveFlg = PTZ_RIGHT;
+        yaw_speed = PTZ_PidSpeed(&PtzYawPid, yaw_error, PtzTargetSpeed);
     }
     else if(yaw_error < -((s16)PtzTargetToleranceX100))
     {
         PTZ_LftRgtMoveFlg = PTZ_LEFT;
+        yaw_speed = PTZ_PidSpeed(&PtzYawPid, yaw_error, PtzTargetSpeed);
+    }
+    else
+    {
+        PTZ_ResetPid(&PtzYawPid);
     }
 
     if(pitch_error > (s16)PtzTargetToleranceX100)
     {
         PTZ_UpDownMoveFlg = PTZ_UP;
+        pitch_speed = PTZ_PidSpeed(&PtzPitchPid, pitch_error, PtzTargetSpeed);
     }
     else if(pitch_error < -((s16)PtzTargetToleranceX100))
     {
         PTZ_UpDownMoveFlg = PTZ_DOWN;
+        pitch_speed = PTZ_PidSpeed(&PtzPitchPid, pitch_error, PtzTargetSpeed);
+    }
+    else
+    {
+        PTZ_ResetPid(&PtzPitchPid);
     }
 
-    PTZ_SetLRSpeed((PTZ_LftRgtMoveFlg == PTZ_STOP) ? 0U : PtzTargetSpeed);
-    PTZ_SetUDSpeed((PTZ_UpDownMoveFlg == PTZ_STOP) ? 0U : PtzTargetSpeed);
+    PTZ_SetLRSpeed((PTZ_LftRgtMoveFlg == PTZ_STOP) ? 0U : yaw_speed);
+    PTZ_SetUDSpeed((PTZ_UpDownMoveFlg == PTZ_STOP) ? 0U : pitch_speed);
     Send_PTZ_Data();
 
     if((PTZ_LftRgtMoveFlg == PTZ_STOP) && (PTZ_UpDownMoveFlg == PTZ_STOP))
     {
         PtzAngleCtrlEnable = 0U;
+        PTZ_ResetPid(&PtzYawPid);
+        PTZ_ResetPid(&PtzPitchPid);
     }
 }
 
+/*      Parsing status      */
 void PTZ_RecvDataProc(u8 *pBuf, u16 len)
 {
     u8 check_sum;
@@ -320,6 +462,10 @@ void PTZ_RecvDataProc(u8 *pBuf, u16 len)
     Ptz_WorkStatus = (PTZ_Status_E)PTZ_RecvFrame_Cmd.Status;
 }
 
+
+
+
+/*      A single point of access for external control   |  50ms    */ 
 void PTZ_ControlProc(void)
 {
     if(g_ctrl_source_active != CTRL_SRC_UPPER)
@@ -340,6 +486,8 @@ void PTZ_ControlProc(void)
     Send_PTZ_Data();
 }
 
+
+
 void PTZ_ApplyControlCmd(void)
 {
     PTZ_ControlProc();
@@ -347,4 +495,3 @@ void PTZ_ApplyControlCmd(void)
 
 
 /******************* (C) COPYRIGHT 2026 END OF FILE ***************************/
-

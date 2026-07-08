@@ -14,6 +14,14 @@
 #define END_SERVO_POSITION_NUM       3U
 #define END_SERVO_ROTATE_INDEX       3U
 
+#define END_SERVO_ID0                0U
+#define END_SERVO_ID1                1U
+#define END_SERVO_ID2                2U
+#define END_SERVO_ID3                3U
+#define END_SERVO_POS_MIN            0
+#define END_SERVO_POS_MAX            4095
+#define END_SERVO_SPEED_MAX          4095U
+
 #define END_AUTO_PRESS_HOLD_MS       300U
 #define END_AUTO_OBJECT_TIMEOUT_MS   5000U
 #define END_AUTO_PUSHROD_TIMEOUT_MS  5000U

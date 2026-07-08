@@ -2,40 +2,57 @@
  * @file        upper_feedback.c
  * @brief       Packs STM32 feedback frames for the upper computer on USART2.
  *
- * Frame:
- *   0xA5 cmd_id payload_len payload crc_low crc_high
+ * @param       frame:  0xA5 cmd_id payload_len payload crc_low crc_high
  *
- * CRC16-CCITT:
- *   init 0xFFFF, poly 0x1021, over cmd_id + payload_len + payload.
+ * @note        CRC16-CCITT:
+ *              init 0xFFFF, poly 0x1021, over cmd_id + payload_len + payload.
+ * @warning     
+ * @license     This project is released under the MIT License.
  *********************************************************************************/
 #include "upper_feedback.h"
+
 #include "usart.h"
 #include "control_dispatcher.h"
+#include "arm_auto_task.h"
+
 #include "encoder.h"
+
 #include "steer_data.h"
 #include "ptz_data.h"
 #include "yushu_motor_data.h"
+
 #include "switch.h"
 #include "timer.h"
 #include "app_config.h"
+#include "subboard_link.h"
 #include "wit_imu.h"
 
+
+
+/*============================ Macro definition ====================================*/
+/* Maximum number of bytes per frame */
 #define UPPER_FB_PAYLOAD_MAX_LEN        32U
+/* Total frame length */
 #define UPPER_FB_FRAME_MAX_LEN          (UPPER_FB_PAYLOAD_MAX_LEN + 5U)
+/* System status codes */
 #define UPPER_FB_SYSTEM_STATE_OK        0U
+
 
 static u16 s_upper_fb_seq = 0U;
 static u32 s_upper_fb_time_ms = 0U;
 
+
+/* Calculate CRC16 (CCITT) */
 static u16 UpperFeedback_Crc16Ccitt(const u8 *data, u16 len)
 {
-    u16 crc = 0xFFFFU;
+    u16 crc = 0xFFFFU;      // Initial value 
     u16 i;
     u8 bit;
 
     for(i = 0U; i < len; i++)
     {
-        crc ^= ((u16)data[i] << 8);
+        crc ^= ((u16)data[i] << 8);   // Equal to 0
+
         for(bit = 0U; bit < 8U; bit++)
         {
             if((crc & 0x8000U) != 0U)
@@ -52,6 +69,9 @@ static u16 UpperFeedback_Crc16Ccitt(const u8 *data, u16 len)
     return crc;
 }
 
+
+/*==============================  Static helper functions  ========================================*/
+/* Store the 16-bit unsigned integer in the buffer in little-endian order and update the index. */
 static void UpperFeedback_PutU16LE(u8 *buf, u8 *idx, u16 value)
 {
     buf[*idx] = (u8)(value & 0xFFU);
@@ -82,6 +102,8 @@ static void UpperFeedback_PutS32LE(u8 *buf, u8 *idx, s32 value)
     UpperFeedback_PutU32LE(buf, idx, (u32)value);
 }
 
+
+/* Scale physical quantities such as motor speed and torque to integers to facilitate transmission */
 static s16 UpperFeedback_ScaleFloatToS16(float value, float scale)
 {
     float scaled = value * scale;
@@ -107,11 +129,13 @@ static s16 UpperFeedback_ScaleFloatToS16(float value, float scale)
     return (s16)scaled;
 }
 
+/* Read the clutch GPIO status */
 static u8 UpperFeedback_GetClutchState(void)
 {
     return (u8)GPIO_ReadOutputDataBit(GPIOD, GPIO_Pin_12);
 }
 
+/* Summary of system fault indicators */
 static u16 UpperFeedback_GetFaultFlags(void)
 {
     u16 flags = 0U;
@@ -136,10 +160,16 @@ static u16 UpperFeedback_GetFaultFlags(void)
     {
         flags |= (1U << 4);
     }
+    if(ArmAutoTask_GetState() == ARM_AUTO_STATE_ERROR)
+    {
+        flags |= (1U << 5);
+    }
 
     return flags;
 }
 
+/*===============================  up feedback ======================================*/
+/* Pack and send the complete host feedback frame */
 static void UpperFeedback_SendFrame(u8 cmd_id, const u8 *payload, u8 payload_len)
 {
     u8 frame[UPPER_FB_FRAME_MAX_LEN];
@@ -167,15 +197,18 @@ static void UpperFeedback_SendFrame(u8 cmd_id, const u8 *payload, u8 payload_len
     USART2_DMA_send(frame, (u8)(payload_len + 5U));
 }
 
+/*=============================== External interface functions ===============================*/
+/* Send robotic arm status frame */
 void UpperFeedback_SendArmState(void)
 {
     u8 payload[31];
     u8 idx = 0U;
+
     const encoder_feedback_t *encoder = Encoder_GetFeedback();
     const wit_imu_feedback_t *imu = WitImu_GetFeedback();
     u8 i;
 
-    s_upper_fb_time_ms += 50U;
+    s_upper_fb_time_ms += 100U;
 
     UpperFeedback_PutU16LE(payload, &idx, s_upper_fb_seq++);
     UpperFeedback_PutU32LE(payload, &idx, s_upper_fb_time_ms);
@@ -200,9 +233,10 @@ void UpperFeedback_SendArmState(void)
     UpperFeedback_SendFrame(UPPER_FB_CMD_ARM_STATE, payload, idx);
 }
 
+/* Send actuator echo frame */
 void UpperFeedback_SendActuatorEcho(void)
 {
-    u8 payload[24];
+    u8 payload[28];
     u8 idx = 0U;
     u8 i;
 
@@ -224,10 +258,15 @@ void UpperFeedback_SendActuatorEcho(void)
     payload[idx++] = Encoder_GetFeedback()->valid;
     payload[idx++] = (u8)SteerActualMode;
     payload[idx++] = (u8)Ptz_WorkStatus;
+    payload[idx++] = ArmAutoTask_GetState();
+    payload[idx++] = ArmAutoTask_GetError();
+    payload[idx++] = SubBoard_LinkGetLastState();
+    payload[idx++] = SubBoard_LinkGetLastError();
 
     UpperFeedback_SendFrame(UPPER_FB_CMD_ACTUATOR_ECHO, payload, idx);
 }
 
+/* Send a diagnostic frame */
 void UpperFeedback_SendDiag(void)
 {
     u8 payload[9];

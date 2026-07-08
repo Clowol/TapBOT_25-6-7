@@ -1,6 +1,9 @@
 /******************** (C) COPYRIGHT 2026 *****************************************
  * @file        wit_imu.c
  * @brief       WitMotion HWT905CAN IMU parser and feedback cache.
+ * @note        
+ * @warning     
+ * @license     This project is released under the MIT License.
  *********************************************************************************/
 #include "wit_imu.h"
 #include "wit_c_sdk.h"

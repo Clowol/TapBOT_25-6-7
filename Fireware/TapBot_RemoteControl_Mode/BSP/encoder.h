@@ -1,35 +1,30 @@
 /******************** (C) COPYRIGHT 2026 *****************************************
-   * @author      Clomol
-   * @date        2026-2027
-   * @brief       
-   * @license     [z]本代码仅用于教学与科研目的，未经作者书面许可，不得用于商业用�?
-   *              This project is released under the MIT License.
-   * @note        
-   * @warning     
-*********************************************************************************/
+ * @file        encoder.h
+ * @brief       Absolute encoder data structures and function prototypes.
+ * @note        
+ * @warning     
+ * @license     This project is released under the MIT License.
+ *********************************************************************************/
 #ifndef __ENCODER_H
 #define __ENCODER_H
 
 #include "stm32f10x.h"               
 
 /* 长度相关参数定义 */
-#define Length_Max 2000
+#define Length_Max 2400
 #define Roller_Perimeter 125         
 #define ON  1
 #define OFF 0
 
 typedef struct
 {
-    u32 raw_position;
-    s16 raw_speed;
-    s32 length_mm;
-    s16 line_speed_mm_s;
-    u8 direction;
-    u8 valid;
+    s32 length_mm;          // the current length
+    s16 line_speed_mm_s;    // the current line_speed
+    u8 valid;               // Data validity flag
 } encoder_feedback_t;
 
 /*********************************************************************
- * @brief 向编码器设置单字节命�?数据
+ * @brief 向编码器设置单字节命令/数据
  * @param Code 命令码或数据值（单字节）
  * @param Obj  目标对象或寄存器地址
  ********************************************************************/
@@ -42,19 +37,19 @@ void Encoder_Set_OneByte_Fun(u8 Code, u8 Obj);
 void Encoder_Set_Resp_Fun(u16 RespCode);
 
 /*********************************************************************
- * @brief 设置编码器位置�?
- * @param PosCode 位置编码�?2位，通常表示绝对位置或脉冲计数）
+ * @brief 设置编码器位置值
+ * @param PosCode 位置编码（32位，通常表示绝对位置或脉冲计数）
  ********************************************************************/
 void Encoder_Set_Pos_Fun(u32 PosCode);
 
 /*********************************************************************
- * @brief 读取编码器的圈数�?
- * @note 该函数通常会更新全局变量或通过返回值返回圈�?
+ * @brief 读取编码器的圈数值
+ * @note 该函数通常会更新全局变量或通过返回值返回圈数
  ********************************************************************/
 void Encoder_Read_Round_Fun(void);
 
 /**********************************************************************
- * @brief 读取编码器的位置和方向信�?
+ * @brief 读取编码器的位置和方向信息
  * @note 通常获取当前位置值和旋转方向
  *********************************************************************/
 void Encoder_Read_Pos_Dirc_Fun(void);
@@ -62,22 +57,26 @@ void Encoder_Read_Pos_Dirc_Fun(void);
 /*********************************************************************
  * @brief 长度控制函数
  * @param Length 指向当前长度值的指针（可能用于输入输出）
- * @return 控制状态（例如是否超过阈值等�?
+ * @return 控制状态（例如是否超过阈值等）
  * @note 根据设定的最大长度进行判断或调整
  ********************************************************************/
+void Encoder_UpdateFromCanFrame(const u8 *data, u8 len);
+
+#if 0
+/* Deprecated unused API. Use Encoder_UpdateFromCanFrame() and Encoder_GetFeedback(). */
 void Solve_Length_and_Linespeed(u8 DataArray[], u8 *Actual_Length, u8 *Actual_Speed);
-
-void Encoder_OnCanFrame(u32 std_id, const u8 *data, u8 len);
-
-const encoder_feedback_t *Encoder_GetFeedback(void);
+#endif
 
 /*********************************************************************
  * @brief 长度控制函数
  * @param Length 指向当前长度值的指针（可能用于输入输出）
- * @return 控制状态（例如是否超过阈值等�?
+ * @return 控制状态（例如是否超过阈值等）
  * @note 根据设定的最大长度进行判断或调整
  ********************************************************************/
+#if 0
+/* Deprecated unused API. Compare Encoder_GetFeedback()->length_mm directly. */
 u8 Length_Control(u8 *Length);
+#endif
 
 /*********************************************************************
  * @brief 编码器模块初始化函数
@@ -85,7 +84,8 @@ u8 Length_Control(u8 *Length);
  ********************************************************************/
 void Encoder_Init(void);
 
-#endif /* __ENCODER_H */
+const encoder_feedback_t *Encoder_GetFeedback(void);
 
+#endif /* __ENCODER_H */
 
 /******************* (C) COPYRIGHT 2026 END OF FILE ***************************/

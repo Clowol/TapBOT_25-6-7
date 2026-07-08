@@ -1,3 +1,7 @@
+/******************** (C) COPYRIGHT 2026 *****************************************
+ * @file        crc_ccitt.h
+ * @brief       CRC-CCITT table and inline update functions.
+ *********************************************************************************/
 #ifndef __CRC_CCITT_H
 #define __CRC_CCITT_H
 

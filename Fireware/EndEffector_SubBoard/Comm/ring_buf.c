@@ -1,5 +1,16 @@
-﻿#include "ring_buf.h"
+﻿/******************** (C) COPYRIGHT 2026 *****************************************
+ * @file        ring_buf.c
+ * @brief       Circular buffer implementation
+ * 
+ * @note        
+ * @warning     
+ * @license     This project is released under the MIT License.
+ *********************************************************************************/
+#include "ring_buf.h"
 
+/**
+ * @brief  Initialisation function
+ */
 void ring_buf_init(ring_buf_t *rb, u8 *buf, u32 size)
 {
     rb->buffer = buf;
@@ -8,21 +19,26 @@ void ring_buf_init(ring_buf_t *rb, u8 *buf, u32 size)
     rb->tail = 0U;
 }
 
+
 u32 ring_buf_available(ring_buf_t *rb)
 {
     return rb->head - rb->tail;
 }
 
+
 u32 ring_buf_put(ring_buf_t *rb, const u8 *data, u32 len)
 {
     u32 written = 0U;
+
     while((written < len) && (ring_buf_available(rb) < rb->size))
     {
         rb->buffer[rb->head & (rb->size - 1U)] = data[written++];
         rb->head++;
     }
+
     return written;
 }
+
 
 u32 ring_buf_get(ring_buf_t *rb, u8 *data, u32 len)
 {
@@ -34,3 +50,6 @@ u32 ring_buf_get(ring_buf_t *rb, u8 *data, u32 len)
     }
     return read;
 }
+
+/******************* (C) COPYRIGHT 2026 END OF FILE ***************************/
+

@@ -1,6 +1,9 @@
 ﻿/******************** (C) COPYRIGHT 2026 *****************************************
  * @file    subboard_protocol.c
  * @brief   High-level command packing for the F103 end-effector sub-board.
+ * @note        
+ * @warning     
+ * @license     This project is released under the MIT License.
  *********************************************************************************/
 #include "subboard_protocol.h"
 #include "subboard_link.h"
@@ -22,7 +25,11 @@ void SubBoardProtocol_OnFrame(u8 cmd_id, const u8 *payload, u8 len)
     switch(cmd_id)
     {
         case SUBBOARD_FB_ACK:
-            if((payload != 0) && (len >= 2U))
+            if((payload != 0) && (len >= 3U))
+            {
+                SubBoard_LinkSetAck(payload[0], payload[1], payload[2]);
+            }
+            else if((payload != 0) && (len >= 2U))
             {
                 SubBoard_LinkSetStatus(payload[0], payload[1]);
             }

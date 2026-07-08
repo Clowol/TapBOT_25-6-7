@@ -1,15 +1,22 @@
 ﻿/******************** (C) COPYRIGHT 2026 *****************************************
  * @file    subboard_link.c
  * @brief   UART5 byte buffering and 0xA6 frame transport for the end-effector board.
+ * @note        
+ * @warning     
+ * @license     This project is released under the MIT License.
  *********************************************************************************/
 #include "subboard_link.h"
 #include "subboard_protocol.h"
 #include "ring_buf.h"
 #include "usart.h"
+#include "app_config.h"
 
 #define SUBBOARD_FRAME_HEAD        0xA6U
 #define SUBBOARD_NODE_ID           0x01U
 #define SUBBOARD_ONLINE_TIMEOUT    50U
+#define SUBBOARD_RS485_DIR_RCC     RCC_APB2Periph_GPIOE
+#define SUBBOARD_RS485_DIR_PORT    GPIOE
+#define SUBBOARD_RS485_DIR_PIN     GPIO_Pin_0
 
 typedef enum
 {
@@ -33,7 +40,38 @@ static u8 ParseIndex;
 static u16 ParseCrc;
 static u8 LastState;
 static u8 LastError;
+static u8 LastAckCmd;
 static u8 OnlineTicks;
+
+void SubBoard_LinkRs485SetRx(void)
+{
+#if APP_SUBBOARD_RS485_AUTO_DIR == 0U
+    GPIO_ResetBits(SUBBOARD_RS485_DIR_PORT, SUBBOARD_RS485_DIR_PIN);
+#endif
+}
+
+void SubBoard_LinkRs485SetTx(void)
+{
+#if APP_SUBBOARD_RS485_AUTO_DIR == 0U
+    GPIO_SetBits(SUBBOARD_RS485_DIR_PORT, SUBBOARD_RS485_DIR_PIN);
+#endif
+}
+
+void SubBoard_LinkRs485DirInit(void)
+{
+#if APP_SUBBOARD_RS485_AUTO_DIR == 0U
+    GPIO_InitTypeDef GPIO_InitStructure;
+
+    RCC_APB2PeriphClockCmd(SUBBOARD_RS485_DIR_RCC, ENABLE);
+
+    GPIO_InitStructure.GPIO_Pin = SUBBOARD_RS485_DIR_PIN;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(SUBBOARD_RS485_DIR_PORT, &GPIO_InitStructure);
+
+    SubBoard_LinkRs485SetRx();
+#endif
+}
 
 static u16 SubBoard_Crc16CcittUpdate(u16 crc, u8 data)
 {
@@ -156,6 +194,7 @@ static void SubBoard_ParseByte(u8 data)
 
 void SubBoard_LinkInit(void)
 {
+    SubBoard_LinkRs485DirInit();
     ring_buf_init(&SubBoardRxRing, SubBoardRxStorage, SUBBOARD_RX_RING_SIZE);
     ParseState = SUBBOARD_PARSE_WAIT_HEAD;
     ParseNode = 0U;
@@ -165,6 +204,7 @@ void SubBoard_LinkInit(void)
     ParseCrc = 0U;
     LastState = SUBBOARD_STATE_UNKNOWN;
     LastError = SUBBOARD_ERR_NONE;
+    LastAckCmd = 0U;
     OnlineTicks = 0U;
 }
 
@@ -176,9 +216,11 @@ void SubBoard_LinkOnRxByte(u8 data)
 void SubBoard_LinkProc(void)
 {
     u8 data;
+    u8 budget = COMM_PARSE_BUDGET_BYTES;
 
-    while(ring_buf_get(&SubBoardRxRing, &data, 1U) == 1U)
+    while((budget > 0U) && (ring_buf_get(&SubBoardRxRing, &data, 1U) == 1U))
     {
+        budget--;
         SubBoard_ParseByte(data);
     }
 }
@@ -195,6 +237,7 @@ u8 SubBoard_LinkSendFrame(u8 cmd_id, const u8 *payload, u8 len)
 {
     u8 i;
     u16 crc;
+    u8 ok = 1U;
 
     if((payload == 0) && (len > 0U))
     {
@@ -207,18 +250,25 @@ u8 SubBoard_LinkSendFrame(u8 cmd_id, const u8 *payload, u8 len)
 
     crc = SubBoard_CalcFrameCrc(SUBBOARD_NODE_ID, cmd_id, len, payload);
 
-    if(SubBoard_SendByte(SUBBOARD_FRAME_HEAD) == 0U) return 0U;
-    if(SubBoard_SendByte(SUBBOARD_NODE_ID) == 0U) return 0U;
-    if(SubBoard_SendByte(cmd_id) == 0U) return 0U;
-    if(SubBoard_SendByte(len) == 0U) return 0U;
+    SubBoard_LinkRs485SetTx();
+
+    if(SubBoard_SendByte(SUBBOARD_FRAME_HEAD) == 0U) ok = 0U;
+    if((ok != 0U) && (SubBoard_SendByte(SUBBOARD_NODE_ID) == 0U)) ok = 0U;
+    if((ok != 0U) && (SubBoard_SendByte(cmd_id) == 0U)) ok = 0U;
+    if((ok != 0U) && (SubBoard_SendByte(len) == 0U)) ok = 0U;
     for(i = 0U; i < len; i++)
     {
-        if(SubBoard_SendByte(payload[i]) == 0U) return 0U;
+        if((ok != 0U) && (SubBoard_SendByte(payload[i]) == 0U))
+        {
+            ok = 0U;
+        }
     }
-    if(SubBoard_SendByte((u8)(crc & 0xFFU)) == 0U) return 0U;
-    if(SubBoard_SendByte((u8)(crc >> 8)) == 0U) return 0U;
+    if((ok != 0U) && (SubBoard_SendByte((u8)(crc & 0xFFU)) == 0U)) ok = 0U;
+    if((ok != 0U) && (SubBoard_SendByte((u8)(crc >> 8)) == 0U)) ok = 0U;
 
-    return 1U;
+    SubBoard_LinkRs485SetRx();
+
+    return ok;
 }
 
 u8 SubBoard_LinkIsOnline(void)
@@ -236,14 +286,22 @@ u8 SubBoard_LinkGetLastError(void)
     return LastError;
 }
 
+u8 SubBoard_LinkGetLastAckCmd(void)
+{
+    return LastAckCmd;
+}
+
 void SubBoard_LinkSetStatus(u8 state, u8 error)
 {
     LastState = state;
     LastError = error;
 }
 
+void SubBoard_LinkSetAck(u8 state, u8 status, u8 ack_cmd)
+{
+    LastState = state;
+    LastError = status;
+    LastAckCmd = ack_cmd;
+}
+
 /******************* (C) COPYRIGHT 2026 END OF FILE ***************************/
-
-
-
-

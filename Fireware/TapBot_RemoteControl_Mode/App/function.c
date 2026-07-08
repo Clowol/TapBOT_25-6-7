@@ -1,30 +1,33 @@
 ﻿/******************** (C) COPYRIGHT 2026 *****************************************
-   * @author      Clomol
-   * @date        2026-2027
-   * @brief       应锟矫诧拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷模锟斤拷锟斤拷锟斤拷锟斤拷诘锟斤拷锟揭ｏ拷亟锟斤拷锟斤拷锟斤拷锟轿伙拷锟斤拷锟斤拷锟斤拷锟?   *              锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷囟锟斤拷锟斤拷锟斤拷台锟斤拷系统状态指示锟斤拷锟斤拷
-   * @license     [z]锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷诮锟窖э拷锟斤拷锟斤拷目锟侥ｏ拷未锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟缴ｏ拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷业锟斤拷途
-   *              This project is released under the MIT License.
-   * @note        锟斤拷锟侥硷拷只锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟阶刺拷锟斤拷锟斤拷锟斤拷锟叫拷锟斤拷锟斤拷锟斤拷执锟斤拷锟斤拷锟斤拷锟狡凤拷锟节讹拷应模锟斤拷锟叫★拷
-   * @warning     USART2 锟斤拷锟斤拷锟斤拷位锟斤拷锟斤拷锟斤拷锟斤拷协锟介，锟侥憋拷锟斤拷印锟斤拷锟斤拷锟斤拷 APP_USART2_TEXT_DEBUG 锟斤拷锟狡★拷
-*********************************************************************************/
+ * @file        function.c
+ * @brief       Application periodic task scheduler and communication proc wrappers.
+ * @note        
+ * @warning     
+ * @license     This project is released under the MIT License.
+ *********************************************************************************/
 #include "function.h"
 
-/********************************** 锟斤拷锟斤拷模式全锟街憋拷锟斤拷 ********************************************/
+/********************************** Control Mode Global Variables ********************************************/
 u8 g_RmtUpManCtrlMode = RMT_MODE;
 u8 g_RmtUpManRealMode = RMT_MODE;
 
-/********************************** 锟斤拷锟皆凤拷锟酵伙拷锟斤拷锟斤拷 **********************************************/
+/********************************** Communication Send Buffers ********************************************/
 u8 USART2_SendBuf[60] = {0};
 u8 USART4_SendBuf[60] = {0};
 
-/********************************** 锟斤拷锟斤拷锟斤拷锟斤拷辗锟斤拷峁癸拷锟?******************************************/
+/********************************** Motor Control Data Structures ********************************************/
 MOTOR_send cmd;
 MOTOR_recv data;
 
+static u8 s_diag_feedback_pending = 0U;         // wait for diag information
+
 /***************************************************************************************************
  * @name   FunctionProce(void)
- * @brief  锟斤拷循锟斤拷锟叫的非讹拷时锟斤拷锟斤拷锟斤拷锟斤拷锟? * @param  锟斤拷
- * @note   遥锟斤拷锟斤拷 USART3 锟斤拷锟轿伙拷锟斤拷锟斤拷锟节此达拷锟斤拷锟斤拷锟窖ｏ拷锟斤拷位锟斤拷 USART2 协锟斤拷锟斤拷 main.c 锟斤拷锟斤拷 ROS2_CommProc 锟斤拷锟斤拷锟斤拷
+ * @brief  Non-timed per-loop processing: USART1/2/4/5 receive handling 
+ *         and remote-controller protocol parsing (USART3 via Rmt_CommProc). 
+ *         Upper-computer protocol (USART2) is handled via ROS2_CommProc in main.c.
+ * @param  None
+ * @note   Called every main-loop iteration, outside the timer-tick scheduler.
  ***************************************************************************************************/
 void FunctionProce(void)
 {
@@ -37,20 +40,31 @@ void FunctionProce(void)
 
 /***************************************************************************************************
  * @name   Function_10ms(void)
- * @brief  10ms 锟斤拷锟斤拷锟斤拷锟斤拷
- * @param  锟斤拷
- * @note   锟斤拷锟狡凤拷锟斤拷锟斤拷锟节达拷刷锟铰匡拷锟斤拷源锟斤拷遥锟斤拷锟斤拷锟筋、锟斤拷位锟斤拷锟斤拷锟斤拷统锟绞弊刺拷锟? ***************************************************************************************************/
+ * @brief  10ms periodic tasks.
+ * @param  None
+ * @note   Updates the control-source dispatcher (remote vs upper-computer arbitration)
+ *         and the sub-board link online timer.
+ ***************************************************************************************************/
 void Function_10ms(void)
 {
-    ControlDispatcher_Update();
-    SubBoard_LinkTick10ms();
+    static u8 subboard_heartbeat_ticks = 0U;
+
+    ControlDispatcher_Update();             // Confirm control dispatcher
+    ArmAutoTask_Proc10ms();
+    SubBoard_LinkTick10ms();                // Timeout check
+    if(++subboard_heartbeat_ticks >= 50U)
+    {
+        subboard_heartbeat_ticks = 0U;
+        SubBoardProtocol_SendHeartbeat();
+    }
 }
 
 /***************************************************************************************************
  * @name   Function_30ms(void)
- * @brief  30ms 锟斤拷锟斤拷锟斤拷锟斤拷
- * @param  锟斤拷
- * @note   锟斤拷锟斤拷锟斤拷锟斤拷 M8010 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟节诧拷锟剿癸拷锟斤拷锟斤拷锟斤拷锟斤拷锟劫讹拷锟斤拷锟斤拷锟酵猴拷
+ * @brief  30ms periodic task: M8010 actuator control processing.
+ * @param  None
+ * @note   Executes YushuMotor_ControlProc() which handles speed mapping, clutch control,
+ *         limit-switch protection, and CAN command transmission for the Unitree M8010 motor.
  ***************************************************************************************************/
 void Function_30ms(void)
 {
@@ -59,22 +73,39 @@ void Function_30ms(void)
 
 /***************************************************************************************************
  * @name   Function_50ms(void)
- * @brief  50ms 锟斤拷锟斤拷锟斤拷锟斤拷
- * @param  锟斤拷
- * @note   执锟斤拷锟斤拷台锟斤拷位锟斤拷锟秸伙拷锟斤拷锟狡ｏ拷锟斤拷锟斤拷锟斤拷位锟斤拷锟斤拷锟斤拷状态帧锟斤拷执锟斤拷锟斤拷锟斤拷锟斤拷帧锟斤拷
+ * @brief  50ms periodic tasks: PTZ control and upper-computer feedback.
+ * @param  None
+ * @note   Sends ARM_STATE (0x80) and ACTUATOR_ECHO (0x81) feedback frames to the
+ *         upper computer, and processes PTZ gimbal control.
  ***************************************************************************************************/
 void Function_50ms(void)
 {
+    static u8 feedback_slot = 0U;
+
     PTZ_ControlProc();
-    UpperFeedback_SendArmState();
-    UpperFeedback_SendActuatorEcho();
+    if(s_diag_feedback_pending != 0U)
+    {
+        s_diag_feedback_pending = 0U;
+        UpperFeedback_SendDiag();
+    }
+    else if(feedback_slot == 0U)
+    {
+        UpperFeedback_SendArmState();
+    }
+    else
+    {
+        UpperFeedback_SendActuatorEcho();
+    }
+    feedback_slot ^= 1U;
 }
 
 /***************************************************************************************************
  * @name   Function_100ms(void)
- * @brief  100ms 锟斤拷锟斤拷锟斤拷锟斤拷
- * @param  锟斤拷
- * @note   锟斤拷锟斤拷 SMS 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷冢锟斤拷锟角帮拷锟揭拷锟斤拷锟?ID3 锟斤拷锟斤拷锟斤拷转锟斤拷锟斤拷俣锟斤拷锟斤拷睢? ***************************************************************************************************/
+ * @brief  100ms periodic task: SMS servo control (position servos ID0-ID2, speed servo ID3).
+ * @param  None
+ * @note   Only active in RMT_MODE. Calls Steer_ControlProc() for servo speed/position
+ *         updates and sub-board end-effector auto-task triggering.
+ ***************************************************************************************************/
 void Function_100ms(void)
 {
     if(g_RmtUpManRealMode == RMT_MODE)
@@ -85,8 +116,9 @@ void Function_100ms(void)
 
 /***************************************************************************************************
  * @name   Function_200ms(void)
- * @brief  200ms 锟斤拷锟斤拷锟斤拷锟斤拷预锟斤拷锟斤拷锟? * @param  锟斤拷
- * @note   锟斤拷前未使锟矫ｏ拷锟斤拷锟斤拷锟缴凤拷锟矫碉拷频状态锟斤拷锟斤拷锟斤拷锟斤拷锟剿诧拷锟斤拷锟斤拷
+ * @brief  200ms periodic tasks (reserved).
+ * @param  None
+ * @note   Currently unused. Reserved for future low-frequency state reporting.
  ***************************************************************************************************/
 void Function_200ms(void)
 {
@@ -94,8 +126,9 @@ void Function_200ms(void)
 
 /***************************************************************************************************
  * @name   Function_300ms(void)
- * @brief  300ms 锟斤拷锟斤拷锟斤拷锟斤拷预锟斤拷锟斤拷锟? * @param  锟斤拷
- * @note   锟斤拷前未使锟矫ｏ拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷实锟斤拷锟叫的碉拷频锟斤拷锟斤拷锟斤拷锟斤拷
+ * @brief  300ms periodic tasks (reserved).
+ * @param  None
+ * @note   Currently unused. Reserved for future low-frequency tasks.
  ***************************************************************************************************/
 void Function_300ms(void)
 {
@@ -103,20 +136,23 @@ void Function_300ms(void)
 
 /***************************************************************************************************
  * @name   Function_500ms(void)
- * @brief  500ms 锟斤拷锟斤拷锟斤拷锟斤拷
- * @param  锟斤拷
- * @note   锟斤拷锟斤拷锟斤拷位锟斤拷锟斤拷锟街★拷锟斤拷锟斤拷锟揭ｏ拷亍锟斤拷锟轿伙拷锟斤拷锟紺AN锟斤拷IMU 锟斤拷锟斤拷锟斤拷状态锟斤拷
+ * @brief  500ms periodic task: diagnostic feedback to upper computer.
+ * @param  None
+ * @note   Sends DIAG frame (0x82) with remote/upper online status, encoder/IMU validity,
+ *         and CAN communication state flags.
  ***************************************************************************************************/
 void Function_500ms(void)
 {
-    UpperFeedback_SendDiag();
+    s_diag_feedback_pending = 1U;
 }
 
 /***************************************************************************************************
  * @name   Function_1s(void)
- * @brief  1s 锟斤拷锟斤拷锟斤拷锟斤拷
- * @param  锟斤拷
- * @note   锟斤拷锟斤拷 LED 锟斤拷锟斤拷锟酵匡拷选锟侥憋拷锟斤拷锟斤拷锟斤拷锟斤拷锟? ***************************************************************************************************/
+ * @brief  1s periodic tasks: LED heartbeat toggle and debug print.
+ * @param  None
+ * @note   Toggles the work LED and BOOT LED, and optionally prints debug info if
+ *         APP_USART2_TEXT_DEBUG is enabled.
+ ***************************************************************************************************/
 void Function_1s(void)
 {
     LED_WorkCtrlFun();
@@ -125,9 +161,10 @@ void Function_1s(void)
 
 /***************************************************************************************************
  * @name   LED_WorkCtrlFun(void)
- * @brief  锟斤拷锟斤拷状态锟狡凤拷转锟斤拷锟斤拷
- * @param  锟斤拷
- * @note   LED1 锟斤拷 BOOT LED 同锟斤拷锟斤拷转锟斤拷锟斤拷锟节观诧拷锟斤拷循锟斤拷锟酵讹拷时锟斤拷锟斤拷锟角凤拷锟斤拷锟斤拷锟斤拷锟叫★拷
+ * @brief  Toggle the work LED and BOOT LED at 1 Hz.
+ * @param  None
+ * @note   LED1 and SW_BOOT_LED toggle together, providing a visual heartbeat
+ *         indication that the main loop is running.
  ***************************************************************************************************/
 void LED_WorkCtrlFun(void)
 {
@@ -149,8 +186,10 @@ void LED_WorkCtrlFun(void)
 
 /***************************************************************************************************
  * @name   USART1_Proc(void)
- * @brief  USART1 锟斤拷锟斤拷锟斤拷杀锟街撅拷锟斤拷锟? * @param  锟斤拷
- * @note   USART1 锟斤拷前锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟?485锟斤拷锟酵拷锟斤拷锟揭碉拷锟斤拷锟斤拷锟斤拷锟节讹拷应执锟斤拷锟斤拷模锟介。
+ * @brief  USART1 receive completion handler.
+ * @param  None
+ * @note   USART1 is currently reserved for RS-485 auxiliary communication.
+ *         Clears the RX status flag when a frame has been received (DMA/IDLE complete).
  ***************************************************************************************************/
 void USART1_Proc(void)
 {
@@ -162,9 +201,11 @@ void USART1_Proc(void)
 
 /***************************************************************************************************
  * @name   USART2_Proc(void)
- * @brief  USART2 锟缴斤拷锟秸憋拷志锟斤拷锟斤拷
- * @param  锟斤拷
- * @note   USART2 锟斤拷锟缴伙拷锟轿伙拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷位锟斤拷协锟介，锟矫猴拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷状态位锟斤拷
+ * @brief  USART2 receive completion flag handler.
+ * @param  None
+ * @note   USART2 carries the upper-computer binary protocol. The actual frame
+ *         parsing is done by ROS2_CommProc/Upper_CommProc; this function only
+ *         clears the DMA/IDLE completion status flag.
  ***************************************************************************************************/
 void USART2_Proc(void)
 {
@@ -176,8 +217,10 @@ void USART2_Proc(void)
 
 /***************************************************************************************************
  * @name   USART4_Proc(void)
- * @brief  UART4 锟斤拷锟斤拷锟斤拷杀锟街撅拷锟斤拷锟? * @param  锟斤拷
- * @note   UART4 锟斤拷前锟斤拷锟斤拷锟斤拷台 485 通锟脚ｏ拷锟斤拷台锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 ptz_data 模锟介。
+ * @brief  UART4 receive completion flag handler.
+ * @param  None
+ * @note   UART4 is used for RS-485 PTZ gimbal communication. PTZ commands are
+ *         sent via the ptz_data module; this function handles RX completion.
  ***************************************************************************************************/
 void USART4_Proc(void)
 {
@@ -189,8 +232,10 @@ void USART4_Proc(void)
 
 /***************************************************************************************************
  * @name   USART5_Proc(void)
- * @brief  UART5 锟斤拷锟斤拷锟斤拷杀锟街撅拷锟斤拷锟? * @param  锟斤拷
- * @note   UART5 锟斤拷前锟斤拷锟节凤拷锟斤拷 SMS 锟斤拷锟?485 通锟脚ｏ拷锟斤拷锟斤拷锟斤拷锟秸筹拷锟斤拷 LEN5 锟斤拷锟斤拷锟斤拷锟斤拷锟皆伙拷锟斤拷锟斤拷锟斤拷使锟矫★拷
+ * @brief  UART5 receive frame processing.
+ * @param  None
+ * @note   UART5 serves as the RS-485 link to the end-effector sub-board (STM32F103).
+ *         Frame parsing and protocol handling are delegated to SubBoard_LinkProc().
  ***************************************************************************************************/
 void USART5_Proc(void)
 {
@@ -199,26 +244,25 @@ void USART5_Proc(void)
 
 /***************************************************************************************************
  * @name   function_prtf(void)
- * @brief  锟斤拷频锟斤拷锟皆达拷印锟斤拷锟? * @param  锟斤拷
- * @note   锟斤拷锟斤拷 APP_USART2_TEXT_DEBUG 锟斤拷 1 时锟斤拷锟矫ｏ拷默锟较关憋拷锟皆憋拷证锟斤拷位锟斤拷锟斤拷锟斤拷锟斤拷协锟介纯锟斤拷锟斤拷
+ * @brief  Low-frequency debug-print function (1 Hz).
+ * @param  None
+ * @note   Only active when APP_USART2_TEXT_DEBUG is set to 1. Prints control mode,
+ *         M8010 speed, servo speed, and PTZ movement flags to USART2.
+ *         Keep disabled during normal operation to avoid corrupting the binary protocol.
  ***************************************************************************************************/
 void function_prtf(void)
 {
 #if APP_USART2_TEXT_DEBUG
     swgPrtUx(USART2, "ctrl=%d yushu=%.1f steer=%d ptz=%d/%d\r\n",
-             (int)g_RmtUpManCtrlMode,
-             YushuSpeed,
-             SteerSendMsgArr[STEER_ROTATE_SERVO_INDEX].SpeedData,
-             PTZ_UpDownMoveFlg,
-             PTZ_LftRgtMoveFlg);
+            (int)g_RmtUpManCtrlMode,
+            YushuSpeed,
+            SteerSendMsgArr[STEER_ROTATE_SERVO_INDEX].SpeedData,
+            PTZ_UpDownMoveFlg,
+            PTZ_LftRgtMoveFlg);
 #endif
 }
 
 
 /******************* (C) COPYRIGHT 2026 END OF FILE ***************************/
-
-
-
-
 
 

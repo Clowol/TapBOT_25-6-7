@@ -1,19 +1,22 @@
 ﻿/******************** (C) COPYRIGHT 2026 *****************************************
-   * @author      Clomol
-   * @date        2026-2027
-   * @brief       锟斤拷锟斤拷锟斤拷锟斤拷冢锟斤拷锟斤拷系统时锟接★拷通锟脚接口★拷执锟斤拷锟斤拷锟酵凤拷锟斤拷模锟斤拷锟绞硷拷锟斤拷锟?   *              锟斤拷锟斤拷 while(1) 锟叫碉拷锟斤拷遥锟斤拷锟斤拷锟斤拷锟斤拷位锟斤拷协锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟?   * @license     [z]锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷诮锟窖э拷锟斤拷锟斤拷目锟侥ｏ拷未锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟缴ｏ拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷业锟斤拷途
-   *              This project is released under the MIT License.
-   * @note        USART2 锟斤拷锟斤拷锟斤拷位锟斤拷锟斤拷锟斤拷锟斤拷协锟介，默锟较诧拷要锟节该达拷锟斤拷锟斤拷锟斤拷谋锟斤拷锟斤拷锟斤拷锟较拷锟?   * @warning     锟睫改筹拷始锟斤拷顺锟斤拷时锟斤拷确锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷系锟斤拷锟斤拷锟斤拷 CAN 锟斤拷始锟斤拷应锟斤拷锟节憋拷锟斤拷锟斤拷/IMU锟斤拷锟斤拷锟斤拷始锟斤拷锟斤拷
-*********************************************************************************/
+ * @file        main.c
+ * @brief       System entry point: hardware init, main loop with timer-driven scheduler.
+ * 
+ * @note        
+ * @warning     
+ * @license     This project is released under the MIT License.
+ *********************************************************************************/
 #include "stm32f10x.h"
 #include "function.h"
 
 /***************************************************************************************************
- * @name   main(void)
- * @brief  系统锟斤拷锟斤拷诤锟斤拷锟? * @param  锟斤拷
- * @return 锟斤拷锟斤拷锟斤拷锟斤拷虏锟斤拷锟斤拷锟? * @note   锟斤拷始锟斤拷顺锟津：伙拷锟斤拷锟斤拷锟斤拷 -> 通锟脚接匡拷 -> 锟斤拷锟狡凤拷锟斤拷锟斤拷 -> 锟斤拷时锟斤拷 -> 执锟斤拷锟斤拷默锟斤拷状态 -> 锟斤拷锟斤拷模锟介。
+ * @name   main()
+ * @brief  System entry point.
+ * @param  None
+ * @return Integer exit code (never returns under normal operation).
+ * @note   Init order: SystemInit -> USART -> CAN -> BSP -> actuators/control -> Timer -> main loop.
  ***************************************************************************************************/
-int main(void)
+int main()
 {
     static u16 cnt1s = 0U;
     static u16 cnt30ms = 0U;
@@ -23,35 +26,35 @@ int main(void)
     static u16 cnt300ms = 0U;
     static u16 cnt500ms = 0U;
 
-    /********************************** 系统锟斤拷锟斤拷锟斤拷始锟斤拷 ********************************************/
+    /********************************** System & Core Init ********************************************/
     SystemInit();
     delay_init(72);
 
     LED_Init();
     NVIC_Configuration();
 
-    /********************************** 通锟脚接口筹拷始锟斤拷 ********************************************/
-    USART1_Init(APP_USART1_BAUD);
-    USART2_Init(APP_USART2_BAUD);
-    USART3_Init(APP_USART3_BAUD);
-    USART4_Init(APP_UART4_BAUD);
-    USART5_Init(APP_UART5_BAUD);
+    /********************************** Communication Peripherals Init ********************************************/
+    USART1_Init(APP_USART1_BAUD);       // USART1:4000000 & YuShuMotor & 485
+    USART2_Init(APP_USART2_BAUD);       // USART2:115200  &	UpControl & 232
+    USART3_Init(APP_USART3_BAUD);       // USART3:115200 & ReMote
+    USART4_Init(APP_UART4_BAUD);        // UART4: 9600 & PTZ & 485
     SubBoard_LinkInit();
+    USART5_Init(APP_UART5_BAUD);        // UART5: 115200 & deputy & 485
 
-    USER_CAN1_Init();
+    USER_CAN1_Init();                  
     USER_CAN2_Init();
 
-    /********************************** 锟藉级锟斤拷锟斤拷锟斤拷锟斤拷锟绞硷拷锟?****************************************/
-    Switch_Init();
+    /********************************** BSP / Board-Level Init ********************************************/
+    Switch_Init();                        // I/O INIT()
     /* ADC1_Init(); */
 
-    /********************************** 应锟斤拷模锟斤拷锟绞硷拷锟?********************************************/
-    ControlDispatcher_Init();
+    /********************************** Application Module Init ********************************************/
+    ControlDispatcher_Init();             // UP_control
 
-    Timer3_Init(10, 7199);
-    Timer4_Init(500, 7199);
+    Timer3_Init(10, 7199);                // 1ms Scheduled
+    Timer4_Init(500, 7199);               // 50ms Scheduled
 
-    SendSteer_SYNC_SetDefaultMode();
+    SendSteer_SYNC_SetDefaultMode();      // Motor Syn Mode set_parameter
     Send_PTZ_Data();
     Encoder_Init();
     WitImu_Init();
@@ -62,11 +65,11 @@ int main(void)
 
     while(1)
     {
-        /********************************** 锟角讹拷时锟斤拷锟斤拷 ********************************************/
+        /********************************** Protocol Frame Processing ********************************************/
         ROS2_CommProc();
         FunctionProce();
 
-        /********************************** 10ms锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 **************************************/
+        /********************************** 10ms Timer-tick Scheduler **************************************/
         if(flag10ms)
         {
             flag10ms = 0U;
@@ -121,5 +124,4 @@ int main(void)
 
 
 /******************* (C) COPYRIGHT 2026 END OF FILE *****************************/
-
 

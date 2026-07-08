@@ -11,7 +11,7 @@
 
 static end_state_t EndState;
 static u8 EndError;
-static u16 StateTicks;
+static u16 StateTicks;              // 当前状态已持续的时间
 static u16 AutoForwardMs;
 static u16 AutoReverseMs;
 static s16 AutoRotateSpeed;
@@ -87,7 +87,7 @@ void EndEffectorTask_StartAuto(u16 forward_ms, u16 reverse_ms, s16 speed)
     AutoForwardMs = forward_ms;
     AutoReverseMs = reverse_ms;
     AutoRotateSpeed = speed;
-    EndEffectorTask_SetState(END_STATE_PUSHROD_EXTEND);
+    EndEffectorTask_SetState(END_STATE_WAIT_OBJECT);
 }
 
 void EndEffectorTask_StopAuto(void)
@@ -110,6 +110,20 @@ void EndEffectorTask_Proc(u16 period_ms)
 
     switch(EndState)
     {
+        case END_STATE_WAIT_OBJECT:
+            Pushrod_Stop();
+            FeetechServo_SetRotateSpeed(0);
+            if(EndGpio_ObjectDetected() != 0U)
+            {
+                EndEffectorTask_SetState(END_STATE_PUSHROD_EXTEND);
+            }
+            else if(StateTicks >= END_AUTO_OBJECT_TIMEOUT_MS)
+            {
+                EndError = 4U;
+                EndEffectorTask_SetState(END_STATE_ERROR);
+            }
+            break;
+
         case END_STATE_PUSHROD_EXTEND:
             Pushrod_Extend();
             if(StateTicks >= APP_CONTROL_PERIOD_MS)

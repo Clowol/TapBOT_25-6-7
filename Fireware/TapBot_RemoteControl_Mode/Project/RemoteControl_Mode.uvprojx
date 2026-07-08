@@ -752,6 +752,11 @@
               <FileType>1</FileType>
               <FilePath>..\Control\control_dispatcher.c</FilePath>
             </File>
+            <File>
+              <FileName>arm_auto_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Control\arm_auto_task.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -776,11 +781,6 @@
               <FileName>upper_feedback.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Protocols\upper_feedback.c</FilePath>
-            </File>
-            <File>
-              <FileName>up_data.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Protocols\up_data.c</FilePath>
             </File>
             <File>
               <FileName>rmt_data.c</FileName>

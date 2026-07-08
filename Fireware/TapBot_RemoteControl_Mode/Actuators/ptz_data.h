@@ -1,12 +1,17 @@
-/******************** (C) COPYRIGHT 2024 *****************************************
- * File Name  : ptz_data.h
- * Description: PTZ command driver for the new gimbal protocol.
- *********************************************************************************/
+/******************** (C) COPYRIGHT 2026 *****************************************
+  * @file        ptz_data.h
+  * @brief       PTZ command driver for the new gimbal protocol.
+  * @note        
+  * @warning     
+  * @license     This project is released under the MIT License.
+  *********************************************************************************/
 #ifndef __PTZ_DATA_H
 #define __PTZ_DATA_H
 
 #include "function.h"
 
+
+/**********************************  Sys Confirm  ********************************************/
 #define PTZ_DEVICE_ADDR         0x01U
 #define PTZ_UART_PORT           UART4
 #define PTZ_UART_BAUDRATE       9600U
@@ -37,13 +42,12 @@ typedef enum
     PTZ_RIGHT = 4U
 } PTZ_Direction_E;
 
-/*
- * New gimbal command byte values.
- *
- * The verified USER/rmt_data.c sends the values defined in USER/rmt_data.h:
- *   PTZ_UP=0x08, PTZ_DOWN=0x10, PTZ_LEFT=0x02, PTZ_RIGHT=0x04.
- * USER/ptz_data.h contains an opposite comment-level enum, but the actual
- * successful runtime path writes the USER/rmt_data.h values into MoveCmd.
+/** 
+ * @brief  gimbal command byte values.
+ * @param PTZ_UP=0x08, 
+ * @param PTZ_DOWN=0x10, 
+ * @param PTZ_LEFT=0x02, 
+ * @param PTZ_RIGHT=0x04.
  */
 typedef enum
 {
@@ -63,6 +67,8 @@ typedef enum
     PTZ_STATUS_ERR_CHECKSUM = 0x04U
 } PTZ_Status_E;
 
+
+/*  PTZ send/receive frame  */
 typedef struct
 {
     u8 StartByte;
@@ -83,20 +89,27 @@ typedef struct
     u8 CheckSum;
 } PTZ_RecvFrame;
 
+
+/**********************************  Global Variables ********************************************/
 extern u8 PTZ_UpDownMoveFlg;
 extern u8 PTZ_LftRgtMoveFlg;
+
 extern PTZ_SendFrame PTZ_SendFrame_Cmd;
 extern PTZ_RecvFrame PTZ_RecvFrame_Cmd;
 extern PTZ_Status_E Ptz_WorkStatus;
 
 void Send_PTZ_Data(void);
+
 void PTZ_SetMoveCmd(PTZ_MoveCmd_E cmd);
 void PTZ_SetLRSpeed(u8 speed);
 void PTZ_SetUDSpeed(u8 speed);
 void PTZ_Stop(void);
+
 void PTZ_SetAngleTarget(s16 yaw_deg_x100, s16 pitch_deg_x100, u16 tolerance_x100, u8 speed);
 void PTZ_DisableAngleCtrl(void);
+
 void PTZ_RecvDataProc(u8 *pBuf, u16 len);
+
 void PTZ_ControlProc(void);
 void PTZ_ApplyControlCmd(void);
 
@@ -104,4 +117,4 @@ void PTZ_ApplyControlCmd(void);
 
 
 
-/******************* (C) COPYRIGHT 2026 END OF FILE ***************************/
+/******************* (C) COPYRIGHT 2026 END OF FILE  *********************************************************************************/

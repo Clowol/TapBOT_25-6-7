@@ -1,4 +1,12 @@
-﻿#include "rs485_link.h"
+﻿/******************** (C) COPYRIGHT 2026 *****************************************
+ * @file        ring_buf.h
+ * @brief       Circular buffer implementation
+ * 
+ * @note        
+ * @warning     
+ * @license     This project is released under the MIT License.
+ *********************************************************************************/
+#include "rs485_link.h"
 #include "ring_buf.h"
 #include "usart.h"
 #include "subboard_protocol.h"
@@ -11,6 +19,8 @@
 #define RX_SIZE           128U
 #define MAX_PAYLOAD       32U
 
+
+
 typedef enum
 {
     PARSE_HEAD = 0,
@@ -22,9 +32,13 @@ typedef enum
     PARSE_CRC_H
 } parse_state_t;
 
+
+
 static u8 RxStorage[RX_SIZE];
+
 static ring_buf_t RxRing;
 static parse_state_t ParseState;
+
 static u8 ParseNode;
 static u8 ParseCmd;
 static u8 ParseLen;
@@ -163,3 +177,5 @@ u8 Rs485Link_SendFrame(u8 cmd_id, const u8 *payload, u8 len)
     Rs485_SetRx();
     return 1U;
 }
+
+/******************* (C) COPYRIGHT 2026 END OF FILE *****************************/

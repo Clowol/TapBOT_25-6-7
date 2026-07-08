@@ -1,11 +1,19 @@
-/******************** (C) COPYRIGHT 2024 *****************************************
- * File Name  : yushu_motor_data.c
- * Description: Unitree M8010 actuator command generation.
-*********************************************************************************/
+/******************** (C) COPYRIGHT 2026 *****************************************
+  * @file        yushu_motor_data.c
+  * @brief       Unitree M8010 actuator command generation.
+  * @note        
+  * @warning     
+  * @license     This project is released under the MIT License.
+ *********************************************************************************/
 #include "yushu_motor_data.h"
 #include "control_math.h"
 #include "control_dispatcher.h"
 #include "app_config.h"
+#include "encoder.h"
+
+/**********************************  Global Variables ********************************************/
+float YushuSpeed = 0.0f;
+
 
 float Gear_Speed_Arr[2][3] =
 {
@@ -13,7 +21,18 @@ float Gear_Speed_Arr[2][3] =
     { YUSHU_SPEED_OUT_BACK, YUSHU_SPEED_OUT_MID,   YUSHU_SPEED_OUT_FORWARD }
 };
 
-float YushuSpeed = 0.0f;
+
+/*   PID struction    */
+typedef struct
+{
+    float integral;
+    float prev_error;
+    u8 initialized;
+} yushu_pid_state_t;
+
+static yushu_pid_state_t YushuLengthPid = {0.0f, 0.0f, 0U};
+
+
 
 static s16 Yushu_ScaleFloat(float value, float scale)
 {
@@ -24,6 +43,8 @@ static s16 Yushu_ScaleFloat(float value, float scale)
     return (s16)(value * scale - 0.5f);
 }
 
+
+//  init state  to  stop
 static void YushuMotor_InitCmdOnce(void)
 {
     cmd.id = YUSHU_M8010_ID;
@@ -34,6 +55,74 @@ static void YushuMotor_InitCmdOnce(void)
     cmd.K_P = 0.0f;
     cmd.K_W = 0.0f;
 }
+
+
+
+/**********************************  PID ********************************************/
+static void YushuMotor_ResetLengthPid(void)
+{
+    YushuLengthPid.integral = 0.0f;
+    YushuLengthPid.prev_error = 0.0f;
+    YushuLengthPid.initialized = 0U;
+}
+
+static float YushuMotor_ClampFloat(float value, float min_value, float max_value)
+{
+    if(value < min_value)
+    {
+        return min_value;
+    }
+    if(value > max_value)
+    {
+        return max_value;
+    }
+    return value;
+}
+
+static float YushuMotor_LengthPidSpeed(s32 target_length_mm, float max_speed)
+{
+    const encoder_feedback_t *encoder = Encoder_GetFeedback();
+    float error;
+    float derivative = 0.0f;
+    float output;
+
+    if((encoder->valid == 0U) || (max_speed <= 0.0f))
+    {
+        YushuMotor_ResetLengthPid();
+        return 0.0f;
+    }
+
+    error = (float)(target_length_mm - encoder->length_mm);
+    if((error >= -((float)YUSHU_LENGTH_TOL_MM)) && (error <= (float)YUSHU_LENGTH_TOL_MM))
+    {
+        YushuMotor_ResetLengthPid();
+        return 0.0f;
+    }
+
+    if(YushuLengthPid.initialized != 0U)
+    {
+        derivative = (error - YushuLengthPid.prev_error) / YUSHU_LENGTH_PID_DT_S;
+    }
+    else
+    {
+        YushuLengthPid.initialized = 1U;
+    }
+
+    YushuLengthPid.integral += error * YUSHU_LENGTH_PID_DT_S;
+    YushuLengthPid.integral = YushuMotor_ClampFloat(YushuLengthPid.integral,
+                                                    -YUSHU_LENGTH_PID_I_LIMIT,
+                                                    YUSHU_LENGTH_PID_I_LIMIT);
+    YushuLengthPid.prev_error = error;
+
+    output = (YUSHU_LENGTH_PID_KP * error) +
+             (YUSHU_LENGTH_PID_KI * YushuLengthPid.integral) +
+             (YUSHU_LENGTH_PID_KD * derivative);
+
+    return YushuMotor_ClampFloat(output, -max_speed, max_speed);
+}
+
+
+/********************************** MExternal interface functions ********************************************/
 
 void YushuMotor_SendControl(void)
 {
@@ -123,7 +212,7 @@ void RmtYushuMotor_MoveCmd(void)
     if(LIMIT_SWITCH_IN != 0)
     {
         if(((Rmt_Y2_FNR_Old == 0) && (Rmt_Y2_FNR == 1)) ||
-           ((Rmt_Y2_FNR_Old == -1) && (Rmt_Y2_FNR == 1)))
+            ((Rmt_Y2_FNR_Old == -1) && (Rmt_Y2_FNR == 1)))
         {
             SW_CLUTCH(ON);
             SendYushuMotor_MoveCmd(YUSHU_STRETCH);
@@ -147,6 +236,7 @@ void RmtYushuMotor_MoveCmd(void)
     }
 }
 
+/*  ========================(30ms)   Core cycle functions ====================*/
 void YushuMotor_ControlProc(void)
 {
     static MOTOR_send *pData;
@@ -162,12 +252,22 @@ void YushuMotor_ControlProc(void)
 
     if(g_ctrl_source_active == CTRL_SRC_UPPER)
     {
-        YushuSpeed = g_ctrl_cmd.yushu_gear_cmd;
+        if(g_ctrl_cmd.yushu_length_ctrl_enable != 0U)
+        {
+            YushuSpeed = YushuMotor_LengthPidSpeed(g_ctrl_cmd.yushu_target_length_mm,
+                                                    g_ctrl_cmd.yushu_length_max_speed);
+        }
+        else
+        {
+            YushuMotor_ResetLengthPid();
+            YushuSpeed = g_ctrl_cmd.yushu_gear_cmd;
+        }
     }
     else
     {
+        YushuMotor_ResetLengthPid();
         if((g_ctrl_cmd.yushu_gear_cmd > -YUSHU_RMT_GEAR_STOP_DEADBAND) &&
-           (g_ctrl_cmd.yushu_gear_cmd < YUSHU_RMT_GEAR_STOP_DEADBAND))
+            (g_ctrl_cmd.yushu_gear_cmd < YUSHU_RMT_GEAR_STOP_DEADBAND))
         {
             YushuSpeed = 0.0f;
         }
@@ -219,6 +319,11 @@ void YushuMotor_ControlProc(void)
             LimitSwitchInFlg = 1U;
         }
 
+        if((LIMIT_SWITCH_IN_Old == 0U) && (LIMIT_SWITCH_IN == 1U))
+        {
+            LimitSwitchInFlg = 0U;
+        }
+
         if(LimitSwitchInFlg == 0U)
         {
             cmd.mode = YUSHU_M8010_MODE_RUN;
@@ -241,6 +346,9 @@ void YushuMotor_ControlProc(void)
     YushuMotor_SendControl();
 }
 
+
+
+
 void RmtYushuMotor_SpeedFun(void)
 {
     YushuMotor_ControlProc();
@@ -248,5 +356,4 @@ void RmtYushuMotor_SpeedFun(void)
 
 
 
-/******************* (C) COPYRIGHT 2026 END OF FILE ***************************/
-
+/******************* (C) COPYRIGHT 2026 END OF FILE  *********************************************************************************/

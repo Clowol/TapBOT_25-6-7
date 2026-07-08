@@ -12,6 +12,7 @@ typedef enum
     END_STATE_IDLE = 0,
     END_STATE_REMOTE_SPEED,
     END_STATE_UPPER_POSITION,
+    END_STATE_WAIT_OBJECT,
     END_STATE_PUSHROD_EXTEND,
     END_STATE_PRESS_HOLD,
     END_STATE_SERVO_FORWARD,
@@ -22,6 +23,8 @@ typedef enum
     END_STATE_ERROR,
     END_STATE_ESTOP
 } end_state_t;
+
+
 
 void EndEffectorTask_Init(void);
 void EndEffectorTask_Proc(u16 period_ms);
